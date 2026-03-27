@@ -7,6 +7,7 @@ grafo  = Grafo()
 print(" -> 1 para adicionar vertice \n -> 2 para adicionar aresta \n -> 3 para mostrar grafo \n -> 4 para remover vertice \n -> 5 para remover aresta \n -> 0 para sair")
 entrada = input()
 while entrada!="0":
+    print("")
     match entrada:
         case "1":
             id = input("Digite o id do vertice: ")
@@ -25,9 +26,8 @@ while entrada!="0":
         case "5":
             origem = input("Digite o id do vertice de origem da aresta a ser removida: ")
             destino = input("Digite o id do vertice de destino da aresta a ser removida: ")
-            for aresta in grafo.get_arestas():
-                if aresta.get_origem() == grafo.get_vertice(origem) and aresta.get_destino() == grafo.get_vertice(destino):
-                    grafo.remove_aresta(aresta)
-                    break
-    print("==============================================================================")
+            o = grafo.get_vertice(int(origem))
+            d = grafo.get_vertice(int(destino))
+            grafo.remove_aresta2(o,d)
+            print("==============================================================================")
     entrada = input(" -> 1 para adicionar vertice \n -> 2 para adicionar aresta \n -> 3 para mostrar grafo \n -> 4 para remover vertice \n -> 5 para remover aresta \n -> 0 para sair")
