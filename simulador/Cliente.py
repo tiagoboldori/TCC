@@ -29,3 +29,11 @@ class Cliente:
         for adj in self.get_all_adj():
             if adj[0] == cliente:
                 return adj
+
+    # PRINT
+    def __str__(self) -> str:
+        texto = "\n______ \nCLIENTE " + str(self.get_nome()) + "\n Adjacencias:"
+        for adj in self.get_all_adj():
+            texto += "\n" + str(self.get_nome()) + " --> " + adj[0].get_nome()
+
+        return texto

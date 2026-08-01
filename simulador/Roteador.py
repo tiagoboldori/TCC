@@ -25,30 +25,33 @@ class Roteador:
     # Métodos de Busca BFS
     def bfs(self, origem: Cliente, destino: Cliente) -> list[Cliente] | None:
 
+        fila = [adj[0] for adj in origem.get_all_adj()]
+        caminho = []
+
         if origem == destino:
             return None
 
-        fila = [adj[0] for adj in origem.get_all_adj()]
+        if len(fila) == 0:
+            print("Caminho não encontrado")
+            return None
 
-        caminho = [origem]
+        for cli in fila:
+            cli.ant = origem
 
-        cli_atual = fila.pop(0)
-        cli_atual.ant = origem
-
-        while True:
+        while len(fila) > 0:
+            cli_atual = fila.pop(0)
             for adj in cli_atual.get_all_adj():
                 cli_adj = adj[0]
                 cli_adj.ant = cli_atual
-
-                if cli_adj == destino:
-                    cli_atual = cli_adj
-
-                    while cli_atual.ant != None:
-                        caminho.insert(1, cli_atual)
-                        cli_atual = cli_atual.ant
-                    return caminho
-
                 fila.append(cli_adj)
-                cli_atual = fila.pop(0)
 
+            if cli_atual == destino:
+                while cli_atual.ant != None:
+                    caminho.insert(0, cli_atual)
+                    cli_atual = cli_atual.ant
+
+                caminho.insert(0, origem)
+                return caminho
+
+        print("Sem caminho encontrado")
         return
