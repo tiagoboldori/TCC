@@ -1,48 +1,85 @@
-import hashlib
-import secrets
 import random
 
 from Cliente import Cliente
 from Informacao import Info
 from Roteador import Roteador
 
-print("Iniciando Teste para BFS")
-
+print("=" * 50)
+print("TESTE ALEATÓRIO - BFS")
+print("=" * 50)
 
 roteador = Roteador()
 
-print("Criando Clientes aleatórios....")
-for i in range(10):
-    cliente = Cliente(str(i))
+# -------------------------
+# Criação dos clientes
+# -------------------------
 
-    for cli in roteador.get_all_clientes():
-        num = random.randint(1, 2)
-        if num == 1:
-            cliente.add_adj(cli, Info(1, 1))
+NUM_CLIENTES = 20
 
-    roteador.add_cliente(cliente)
-    print(cliente.get_nome(), "Criado!")
-
+for i in range(NUM_CLIENTES):
+    roteador.add_cliente(Cliente(str(i)))
 
 clientes = roteador.get_all_clientes()
 
-for c in clientes:
-    print(c)
+# -------------------------
+# Criação das arestas
+# -------------------------
 
+for origem in clientes:
+    for destino in clientes:
+        # Não cria laço para ele mesmo
+        if origem == destino:
+            continue
 
-random_num = random.randint(0, len(clientes) - 1)
-random_cli_1 = clientes[random_num]
-random_num = random.randint(0, len(clientes) - 1)
-random_cli_2 = clientes[random_num]
+        # 30% de chance de criar a aresta
+        if random.random() < 0.20:
+            origem.add_adj(destino, Info(1, 1))
 
+# -------------------------
+# Mostrar o grafo
+# -------------------------
 
-print("Calculando caminho de:", random_cli_1, random_cli_2)
+print("\nGRAFO GERADO\n")
 
-bfs = roteador.bfs(random_cli_1, random_cli_2)
+for cliente in clientes:
+    print(f"{cliente.get_nome()} -> ", end="")
 
-try:
-    print("Caminho encontrado:")
-    for cli in bfs:
-        print(cli.get_nome())
-except:
-    print("Caminho não encontrado")
+    adjs = cliente.get_all_adj()
+
+    if len(adjs) == 0:
+        print("[]")
+        continue
+
+    print(", ".join(adj[0].get_nome() for adj in adjs))
+
+# -------------------------
+# Escolhe origem e destino
+# -------------------------
+
+origem = random.choice(clientes)
+destino = random.choice(clientes)
+
+while origem == destino:
+    destino = random.choice(clientes)
+
+print("\n" + "=" * 50)
+print(f"Origem : {origem.get_nome()}")
+print(f"Destino: {destino.get_nome()}")
+print("=" * 50)
+
+# -------------------------
+# Executa BFS
+# -------------------------
+
+caminho = roteador.bfs(origem, destino)
+
+# -------------------------
+# Resultado
+# -------------------------
+
+if caminho is None:
+    print("\nNenhum caminho encontrado.")
+else:
+    print("\nCaminho encontrado:")
+
+    print(" -> ".join(cli.get_nome() for cli in caminho))
