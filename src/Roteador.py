@@ -28,7 +28,7 @@ class Roteador:
         cliente1.add_adj(cliente2, info)
         cliente2.add_adj(cliente1, info)
 
-    # Métodos de Busca BFS
+    #BFS
     def bfs(self, origem: Cliente, destino: Cliente) -> list[Cliente] | None:
         for cli in self.get_all_clientes():
             cli.ant = None
