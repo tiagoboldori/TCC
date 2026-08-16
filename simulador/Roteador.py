@@ -1,4 +1,5 @@
 from Cliente import Cliente
+from Informacao import Info
 
 
 class Roteador:
@@ -21,6 +22,11 @@ class Roteador:
 
         if cliente not in self.__clientes:
             self.__clientes.append(cliente)
+
+
+    def add_adj(self, cliente1: Cliente, cliente2: Cliente, info:Info) -> None:
+        cliente1.add_adj(cliente2, info)
+        cliente2.add_adj(cliente1, info)
 
     # Métodos de Busca BFS
     def bfs(self, origem: Cliente, destino: Cliente) -> list[Cliente] | None:

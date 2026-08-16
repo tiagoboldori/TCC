@@ -14,7 +14,7 @@ roteador = Roteador()
 # Criação dos clientes
 # -------------------------
 
-NUM_CLIENTES = 20
+NUM_CLIENTES = 10
 
 for i in range(NUM_CLIENTES):
     roteador.add_cliente(Cliente(str(i)))
@@ -31,9 +31,9 @@ for origem in clientes:
         if origem == destino:
             continue
 
-        # 30% de chance de criar a aresta
+        # 20% de chance de criar a aresta
         if random.random() < 0.20:
-            origem.add_adj(destino, Info(1, 1))
+            roteador.add_adj(origem, destino, Info(1, 1))
 
 # -------------------------
 # Mostrar o grafo

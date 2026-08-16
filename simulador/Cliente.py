@@ -18,11 +18,14 @@ class Cliente:
     def set_adj(self, adj: list) -> None:
         self.__adj = adj
 
-    def add_adj(self, cliente, info):
-        if [cliente, info] not in self.get_all_adj():
-            self.__adj.append([cliente, info])
+    def add_adj(self, cliente, info) -> None:
+        for i in self.get_all_adj():
+            if i[0] == cliente:
+                return
 
-    def get_all_adj(self):
+        self.__adj.append([cliente, info])
+
+    def get_all_adj(self) -> list:
         return self.__adj
 
     def get_adj(self, cliente):
