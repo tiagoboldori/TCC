@@ -1,2 +1,64 @@
-if __name__ == "__main__":
-    print("Olá Mundo")
+from functools import partial
+
+from src import Executive
+from src.ApplicationSpecific import ActivityType, Client, NetworkModel, Packet
+from src.ApplicationSpecific.Router import Router
+from src.Engine import Engine, TimeCell
+
+
+
+client = None
+packet = None
+activity_type = None
+
+
+engine = Engine()
+
+router = Router()
+network_model = NetworkModel.NetworkModel(router=router, engine=engine)
+
+executive = Executive.Executive(engine, network_model)
+
+
+
+client = Client.Client(name="Client1")
+packet = Packet.Packet(data="Packet1")
+activity_type = ActivityType.ActivityType.START_PROCESSING
+network_model.clients.append(client)
+
+cell = TimeCell(
+    name="A",
+    time=executive.engine.get_current_time(),
+    action=partial(
+        executive.network_model.B_arrival,
+        client,
+        packet,
+        activity_type
+    )
+)
+
+engine.add_time_cell(cell)
+
+cell = TimeCell(
+    name="B",
+    time=executive.engine.get_current_time() + 1,
+    action=partial(
+        executive.network_model.B_arrival,
+        client,
+        packet,
+        activity_type
+    )
+)
+
+engine.add_time_cell(cell)
+
+
+for time_cell in engine.time_cells:
+    print(time_cell)
+
+
+executive.run(until=10)
+
+for cli in network_model.clients:
+    print(f"Client: {cli.get_name()}")
+    print(f"Queue: {[item.get_packet().get_data() for item in cli.get_queue()]}")

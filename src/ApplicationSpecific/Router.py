@@ -1,35 +1,35 @@
-from Cliente import Cliente
-from Informacao import Info
+from src.ApplicationSpecific.Client import Client
+from src.ApplicationSpecific.Information import Info
 
 
-class Roteador:
+class Router:
     def __init__(self) -> None:
         self.__clientes = []
 
     # Getter/Setter CLIENTES
-    def get_all_clientes(self) -> list[Cliente]:
+    def get_all_clientes(self) -> list[Client]:
         return self.__clientes
 
-    def get_cliente(self, nome) -> Cliente | None:
+    def get_cliente(self, name) -> Client | None:
         for cli in self.get_all_clientes():
-            if cli.get_nome() == nome:
+            if cli.get_name() == name:
                 return cli
 
-    def add_cliente(self, cliente: Cliente) -> None:
+    def add_cliente(self, cliente: Client) -> None:
         for c in self.__clientes:
-            if c.get_nome() == cliente.get_nome():
+            if c.get_name() == cliente.get_name():
                 return
 
         if cliente not in self.__clientes:
             self.__clientes.append(cliente)
 
 
-    def add_adj(self, cliente1: Cliente, cliente2: Cliente, info:Info) -> None:
+    def add_adj(self, cliente1: Client, cliente2: Client, info:Info) -> None:
         cliente1.add_adj(cliente2, info)
         cliente2.add_adj(cliente1, info)
 
     #BFS
-    def bfs(self, origem: Cliente, destino: Cliente) -> list[Cliente] | None:
+    def bfs(self, origem: Client, destino: Client) -> list[Client] | None:
         for cli in self.get_all_clientes():
             cli.ant = None
 

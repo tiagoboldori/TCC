@@ -4,6 +4,12 @@ from Cliente import Cliente
 from Informacao import Info
 from Roteador import Roteador
 
+
+
+#provisorio
+from src.SimulationEngine import Simulador
+
+
 print("=" * 50)
 print("TESTE ALEATÓRIO - BFS")
 print("=" * 50)
@@ -83,3 +89,12 @@ else:
     print("\nCaminho encontrado:")
 
     print(" -> ".join(cli.get_nome() for cli in caminho))
+
+
+
+
+sim = Simulador()
+
+sim.set_roteador(roteador)
+
+sim.start()
