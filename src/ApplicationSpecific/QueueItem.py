@@ -1,8 +1,8 @@
 
 class QueueItem:
-    def __init__(self, packet, activity_type):
+    def __init__(self, packet_id, activity_type):
         self.__activity_type = activity_type
-        self.__packet = packet
+        self.__packet_id = packet_id
 
     def get_activity_type(self):
         return self.__activity_type
@@ -11,8 +11,8 @@ class QueueItem:
         self.__activity_type = activity_type
 
 
-    def get_packet(self):
-        return self.__packet
+    def get_packet_id(self):
+        return self.__packet_id
 
-    def set_packet(self, packet):
-        self.__packet = packet
+    def set_packet_id(self, packet_id):
+        self.__packet_id = packet_id

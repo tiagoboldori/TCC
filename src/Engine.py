@@ -17,27 +17,42 @@ class TimeCell:
 class Engine:
 
     def __init__(self):
-        self.clock = 0
-        self.time_cells = []
+        self.__clock = 0
+        self.__time_cells = []
+
+    def get_time_cells(self):
+            return self.__time_cells
+    
+    def set_time_cells(self, time_cells):
+        self.__time_cells = time_cells
 
     def add_time_cell(self, cell):
-        self.time_cells.append(cell)
+        self.__time_cells.append(cell)
 
-    def schedule(self, cell, time):
-        cell.time = time
+
+
+    def schedule(self, cell):
+        cell.time = self.get_current_time() + cell.time
+        self.add_time_cell(cell)
 
     def next_time(self):
         return min(
-            (cell.time for cell in self.time_cells),
+            (cell.time for cell in self.__time_cells),
             default=inf
         )
 
     def cells_due_now(self):
         return [
             cell
-            for cell in self.time_cells
-            if cell.time == self.clock
+            for cell in self.__time_cells
+            if cell.time == self.__clock
         ]
 
     def get_current_time(self):
-        return self.clock
+        return self.__clock
+
+    def set_current_time(self, time):
+        self.__clock = time
+
+
+    

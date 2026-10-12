@@ -1,6 +1,7 @@
 from collections import deque
 
 from src.ApplicationSpecific.QueueItem import QueueItem
+from src.ApplicationSpecific.config import config_loader
 
 
 # Nome é identificador de cliente
@@ -12,26 +13,51 @@ from src.ApplicationSpecific.QueueItem import QueueItem
 
 
 class Client:
-    def __init__(self, name: str) -> None:
+    def __init__(self, name: str, data_structure: str) -> None:
 
         self.__name = name
         self.__adj = []
         self.is_busy = False
 
-        self.__queue = deque()
+        self.__job_queue = deque()
         self.__current_job = None
         self.__next_job = 0
 
 
+        self.__packet_list = config_loader.DSAs[data_structure]()
+
+
 
     #Setters e Getters para fila de pacotes
-    def get_queue(self):
-        return self.__queue
-    def set_queue(self, queue):
-        self.__queue = queue
+    def get_job_queue(self):
+        return self.__job_queue
+    
+    def set_job_queue(self, queue):
+        self.__job_queue = queue
 
-    def add_to_queue(self, packet, activity_type):
-        self.__queue.append(QueueItem(packet, activity_type))
+
+    def add_to_queue(self, packet_id, activity_type):
+        self.__job_queue.append(QueueItem(packet_id, activity_type))
+
+    def remove_from_queue(self, queueItem):
+        for item in self.__job_queue:
+            if item == queueItem:
+                self.__job_queue.remove(item)
+                return
+
+
+    # GETTER PARA LISTA DE PACOTES (dsa)
+    def get_packet_list(self):
+        return self.__packet_list
+
+
+
+    #getter e setter is_busy
+    def get_is_busy(self):
+        return self.is_busy
+
+    def set_is_busy(self, busy):
+        self.is_busy = busy
 
     #Setters e Getters para pacote atual
     def get_current_job(self):
@@ -46,6 +72,8 @@ class Client:
 
     def set_next_job(self, job):
         self.__next_job = job
+
+
 
 
 

@@ -22,7 +22,7 @@ class Executive:
             if next_time == inf:
                 break
 
-            self.engine.clock = next_time
+            self.engine.set_current_time(next_time)
 
             print("\n=============================\nSimulation Clock = " + str(self.engine.get_current_time()))
 
