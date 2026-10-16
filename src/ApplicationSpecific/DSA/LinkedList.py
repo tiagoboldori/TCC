@@ -10,13 +10,12 @@ class LinkedList(DSA_Interface):
 
 
 
-    def get_packet(self, packet_id):
+    def get_packet(self, packet_id) -> dict:
         # Implement the logic to retrieve a packet by its ID
         time=1
 
         current = self.__head
         
-
         while current is not None:
             time+=1
 

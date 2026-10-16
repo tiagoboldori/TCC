@@ -16,10 +16,10 @@ executive = Executive.Executive(engine, network_model)
 
 
 
-client = Client.Client(name="Client1", data_structure="LinkedList")
+client = Client.Client(name="Client1", data_structure="SkipList")
 network_model.clients.append(client)
 
-client = Client.Client(name="Client2", data_structure="LinkedList")
+client = Client.Client(name="Client2", data_structure="SkipList")
 network_model.clients.append(client)
 
 
@@ -33,7 +33,7 @@ client.get_packet_list().add_packet(packet_id=2, packet=packet)
 
 
 
-activity_type = ActivityType.ActivityType.C_START_PROCESSING_ASSEMBLY
+activity_type = ActivityType.ActivityType.C_START_PROCESSING_SOURCE
 
 
 

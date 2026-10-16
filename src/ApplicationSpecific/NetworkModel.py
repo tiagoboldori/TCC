@@ -49,7 +49,7 @@ class NetworkModel:
 
 
             match activity_type:
-                case ActivityType.C_START_PROCESSING_ASSEMBLY:
+                case ActivityType.C_START_PROCESSING_SOURCE:
                     # valor arbitrario de processamento obtido a partir de uma distribuicao uniforme + tempo da DSA usada * distribuicao uniforme arbitraria de 1.0 até 1.5
                     temp = client.get_packet_list().get_packet(packet_id)
                     packet = temp["packet"]
