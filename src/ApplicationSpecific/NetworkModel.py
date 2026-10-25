@@ -2,26 +2,34 @@
 from functools import partial
 import random
 
+from src.ApplicationSpecific.Client import Client
 from src.ApplicationSpecific.ActivityType import ActivityType
+from src.ApplicationSpecific.Information import Info
 from src.Engine import TimeCell
 
 
 class NetworkModel:
     def __init__(self, router, engine):
-        
+
+        #route to target
+        # clients[0] = source
+        # clients[len(clients)-1] = target
         self.clients = []
 
         self.router = router
         
         self.engine = engine
 
+        self.total_processing_time = 0.0
+
+
 
     #B's and C's Simulação
 
-    def B_arrival(self, client,  packet_id, activity_type):
+    def B_arrival(self, client,  packet_id: int, activity_type: ActivityType):
         client.add_to_queue(packet_id, activity_type)
 
-    def B_departure(self, client):
+    def B_departure(self, client: Client):
         client.set_is_busy(False)
         client.set_current_job(None)
 
@@ -34,7 +42,7 @@ class NetworkModel:
             self.C_process(client)
 
 
-    def C_process(self, client):
+    def C_process(self, client: Client):
 
         if not client.is_busy and len(client.get_job_queue()) > 0:
             current_job = client.get_job_queue().popleft()
@@ -51,27 +59,116 @@ class NetworkModel:
             match activity_type:
                 case ActivityType.C_START_PROCESSING_SOURCE:
                     # valor arbitrario de processamento obtido a partir de uma distribuicao uniforme + tempo da DSA usada * distribuicao uniforme arbitraria de 1.0 até 1.5
-                    temp = client.get_packet_list().get_packet(packet_id)
-                    packet = temp["packet"]
-                    time = temp["time"]
-                    processing_time = random.uniform(2,5) + time * random.uniform(1.0, 1.5)
+                    self.C_start_processing_source(client,packet_id, activity_type)
 
-                    print(f"Client {client.get_name()} is processing packet {packet_id} with activity type {activity_type} for {processing_time:.2f} time units.")
-
-                    
-                    cell = TimeCell(
-                        name = f"{client.get_name()} B_departure ",
-                        time = processing_time,
-                        action = partial(
-                            self.B_departure,
-                            client
-                        )
-                    )
-
-                    self.engine.schedule(cell)
-
-                    print(f"Scheduled B_departure for packet {packet_id} at time {self.engine.get_current_time() + processing_time:.2f}.")
-                    
+                case ActivityType.C_START_TRANSMISSION:
+                    self.C_start_transmission(client, packet_id, activity_type)
+                                        
                 case _:
                     raise ValueError(f"Invalid activity type: {activity_type}")
+
+
+
+    #C_START_PROCESSING_SOURCE
+    def C_start_processing_source(self, client: Client, packet_id: int, activity_type: ActivityType):
+        # Implement the logic for processing a source packet
+        temp = client.get_packet_list().get_packet(packet_id)
+        packet = temp["packet"]
+        time = temp["time"]
+        processing_time = random.uniform(2,5) + time * random.uniform(1.0, 1.5)
+
+        #metrics
+        self.total_processing_time += processing_time
+
+        print(f"Client {client.get_name()} is processing packet {packet_id} with activity type {activity_type} for {processing_time:.2f} time units.")
+
+        
+        cell = TimeCell(
+            name = f"{client.get_name()} B_departure ",
+            time = processing_time,
+            action = partial(
+                self.B_departure,
+                client
+            )
+        )
+
+        self.engine.schedule(cell)
+
             
+        print(f"Scheduled B_departure for activity {cell.name} at time {self.engine.get_current_time() + processing_time:.2f}.")
+        print(f"")
+
+        #start_transmission routine
+        cell = TimeCell(
+            name = f"{client.get_name()} B_arrival ",
+            time = processing_time,
+            action = partial(
+                self.B_arrival,
+                client,
+                packet_id,
+                ActivityType.C_START_TRANSMISSION
+            )
+        )
+        print(f"Scheduling B_arrival for packet {packet_id} after processing time.")
+        self.engine.schedule(cell)
+
+
+
+    def C_start_transmission(self, client: Client, packet_id: int, activity_type: ActivityType):
+        # Implement the logic for starting transmission
+
+        # A FAZER: ADICIONAR TEMPO DE PROCESSAMENTO PARA ATIVIDADE
+        print(f"Client {client.get_name()} is starting transmission for packet {packet_id} with activity type {activity_type} at time {self.engine.get_current_time():.2f}.")
+        print(f"Scheduling B_departure for packet {packet_id} after transmission time.")
+
+        idx = self.clients.index(client)
+
+        adj = client.get_all_adj()
+
+        if idx < len(self.clients) - 1:
+            next_client = self.clients[idx+1]
+            for a in adj:
+                if a[0] == next_client:
+                    info = a[1]
+                    break
+
+                
+
+            # PESQUISAR SOBRE TEMPO DE ENVIO / PROCESSAMENTO PARA ESTE CASO EM ESPECIFICO PARA BASE DE SIMULACAO MELHOR
+            cell = TimeCell(
+                name = f"{client.get_name()} B_departure ",
+                time = 2,
+                action = partial(
+                    self.B_departure,
+                    client
+                )
+            )
+
+            self.engine.schedule(cell)
+
+                
+            print(f"Scheduled B_departure for current  Transmission Activity {cell.name} at time {self.engine.get_current_time()+2} ")
+            print(f"")
+
+
+            #cell = TimeCell(
+            #    name = f"{client.get_name()} B_arrival ",
+            #    time = info.get_latencia_simulada(),
+            #    action = partial(
+            #        self.B_arrival,
+            #        next_client,
+            #        packet_id,
+            #        ActivityType.C_START_PROCESSING_GENERIC
+            #    )
+            #)
+            #self.engine.schedule(cell)
+            print(f"Scheduled B_arrival for activity 'cell.name' at time {self.engine.get_current_time() + info.get_latencia_simulada():.2f}.")
+
+
+            
+
+        else:
+            #adicionar B_departure para caso abaixo
+            print(f"Client {client.get_name()} is the last client in the network. No next client to transmit to. End of Simulation")
+            raise ValueError("End of Simulation reached.")
+        

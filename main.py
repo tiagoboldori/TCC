@@ -2,6 +2,7 @@ from functools import partial
 
 from src import Executive
 from src.ApplicationSpecific import ActivityType, Client, NetworkModel, Packet
+from src.ApplicationSpecific.Information import Info
 from src.ApplicationSpecific.Router import Router
 from src.Engine import Engine, TimeCell
 
@@ -16,19 +17,25 @@ executive = Executive.Executive(engine, network_model)
 
 
 
-client = Client.Client(name="Client1", data_structure="SkipList")
-network_model.clients.append(client)
 
-client = Client.Client(name="Client2", data_structure="SkipList")
-network_model.clients.append(client)
+client1 = Client.Client(name="Client1", data_structure="SkipList")
+network_model.clients.append(client1)
 
+
+
+
+client2 = Client.Client(name="Client2", data_structure="SkipList")
+network_model.clients.append(client2)
+
+
+client1.add_adj(client2, Info(latencia=15, perda=0.1, variancia=0.2))
 
 
 packet = Packet.Packet(data="Packet1")
 client = network_model.clients[0]
 client.get_packet_list().add_packet(packet_id=1, packet=packet)
-packet = Packet.Packet(data="Packet2")
-client.get_packet_list().add_packet(packet_id=2, packet=packet)
+#packet = Packet.Packet(data="Packet2")
+#client.get_packet_list().add_packet(packet_id=2, packet=packet)
 
 
 
@@ -52,18 +59,18 @@ engine.schedule(cell)
 
 
 
-cell = TimeCell(
-    name = "B_arrival Client1 Packet2",
-    time = 2,
-    action = partial(
-        executive.network_model.B_arrival,
-        network_model.clients[0],
-        2,
-        activity_type
-    )
-)
+#cell = TimeCell(
+#    name = "B_arrival Client1 Packet2",
+#    time = 2,
+#    action = partial(
+#        executive.network_model.B_arrival,
+#        network_model.clients[0],
+#        2,
+#        activity_type
+#    )
+#)
 
-engine.schedule(cell)
+#engine.schedule(cell)
 
 
 print("Time Cells/Agendamentos existentes:")
@@ -81,4 +88,4 @@ print("\nFim da simulação...\n==============================")
 print("Resultado dos Clients após simulação:")
 for cli in network_model.clients:
     print(f"Client: {cli.get_name()}")
-    print(f"Queue: {[item.get_packet().get_data() for item in cli.get_job_queue()]}")
+    print(f"Queue: {[cli.get_packet_list().get_packet(item.get_packet_id())['packet'].get_data() for item in cli.get_job_queue()]}")

@@ -1,5 +1,6 @@
 from collections import deque
 
+from src.ApplicationSpecific.Information import Info
 from src.ApplicationSpecific.QueueItem import QueueItem
 from src.ApplicationSpecific.config import config_loader
 
@@ -7,7 +8,6 @@ from src.ApplicationSpecific.config import config_loader
 # Nome é identificador de cliente
 # Representação por lista de adjacencias.
 # adj = [[Cliente, Info], [Cliente2, Info2], ...]
-
 
 
 
@@ -77,7 +77,6 @@ class Client:
 
 
 
-
     # Setter e Getter NOME
     def set_name(self, name: str) -> None:
         self.__name = name
@@ -90,7 +89,7 @@ class Client:
     def set_adj(self, adj: list) -> None:
         self.__adj = adj
 
-    def add_adj(self, client, info) -> None:
+    def add_adj(self, client: Client, info: Info) -> None:
         for i in self.get_all_adj():
             if i[0] == client:
                 return
