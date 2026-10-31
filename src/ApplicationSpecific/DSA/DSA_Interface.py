@@ -20,4 +20,10 @@ class DSA_Interface(ABC):
         pass
 
 
+    @abstractmethod
+    def get_all_packets(self) -> dict | list:
+        # Implement the logic to retrieve all packets
+        pass
+
+
 

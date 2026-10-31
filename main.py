@@ -17,10 +17,8 @@ executive = Executive.Executive(engine, network_model)
 
 
 
-
 client1 = Client.Client(name="Client1", data_structure="SkipList")
 network_model.clients.append(client1)
-
 
 
 
@@ -28,7 +26,7 @@ client2 = Client.Client(name="Client2", data_structure="SkipList")
 network_model.clients.append(client2)
 
 
-client1.add_adj(client2, Info(latencia=15, perda=0.1, variancia=0.2))
+client1.add_adj(client2, Info(latencia=15, perda=0.25, variancia=0.2))
 
 
 packet = Packet.Packet(data="Packet1")
@@ -81,11 +79,15 @@ for time_cell in engine.get_time_cells():
 print("\n...\n")
 
 print("Iniciando Simulação... \n==============================")
-executive.run(until = 10)
+
+executive.run()
+
 print("\nFim da simulação...\n==============================")
 
 
-print("Resultado dos Clients após simulação:")
+print("Resultado dos Clients após simulação:\n==============================")
 for cli in network_model.clients:
+    print("__________________________")
     print(f"Client: {cli.get_name()}")
     print(f"Queue: {[cli.get_packet_list().get_packet(item.get_packet_id())['packet'].get_data() for item in cli.get_job_queue()]}")
+    print(f"Packets: {cli.get_packet_list().get_all_packets()}")

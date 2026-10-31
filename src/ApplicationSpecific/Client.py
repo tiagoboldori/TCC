@@ -13,15 +13,18 @@ from src.ApplicationSpecific.config import config_loader
 
 
 class Client:
-    def __init__(self, name: str, data_structure: str) -> None:
+    def __init__(self, name: str, data_structure: str, window_size = 5) -> None:
 
         self.__name = name
         self.__adj = []
-        self.is_busy = False
+        self.__is_busy = False
 
         self.__job_queue = deque()
         self.__current_job = None
         self.__next_job = 0
+
+        self.__window_size = window_size
+        self.__curent_idx = 0
 
 
         self.__packet_list = config_loader.DSAs[data_structure]()
@@ -54,10 +57,10 @@ class Client:
 
     #getter e setter is_busy
     def get_is_busy(self):
-        return self.is_busy
+        return self.__is_busy
 
     def set_is_busy(self, busy):
-        self.is_busy = busy
+        self.__is_busy = busy
 
     #Setters e Getters para pacote atual
     def get_current_job(self):
