@@ -47,15 +47,43 @@ class NetworkModel:
 
 
     def C_process_all(self):
+        #ADICIONAR VERIFICACAO POR PACOTES DISPONIVEIS NA APLICAÇÃO (verificar se há espaço no buffer de memória do selective repeat)
         for client in self.clients:
             self.C_process(client)
 
 
     def C_process(self, client: Client):
 
-        if not client.is_busy and len(client.get_job_queue()) > 0:
-            current_job = client.get_job_queue().popleft()
-    
+        if not client.get_is_busy() and len(client.get_job_queue()) > 0:
+
+
+            # VALIDAÇÂO PARA PACKET_LOAD
+            # Packet load deve respeitar tamanho do buffer do protocolo
+            # Caso não haja espaço, busca o proximo evento tipo C que não seja do tipo LOAD_PACKET
+            # Falta: implementar evento do load packet, trocar referencias antigas (packet_list) para o buffer do protocolo (protocol_buffer)
+            # trocar implementação atual para que processamentos busquem do buffer do protocolo na origem e no destino
+            # fazer com que processamento de atividade C load packet busque do application memory e insira diretamente no protocol buffer
+            
+            # no mais: durante transmissao deve ser gerado evento B para timeout individual do pacote
+            # durante processamento de pacote ACK deve-se remover o timeout do pacote enviado
+            # ao receber pacote NACK deve-se remanejar timeout agendado
+            if client.get_job_queue()[0].get_activity_type() == ActivityType.C_LOAD_PACKET and len(client.get_protocol_buffer()) >= client.get_buffer_size():
+                    
+                    keep = client.get_job_queue()
+
+                    while client.get_job_queue():
+                            current_job = client.get_job_queue().popleft()
+                            if current_job.get_activity_type() != ActivityType.C_LOAD_PACKET:
+                                break
+                            else:
+                                keep.append(current_job)
+
+                    client.set_job_queue(keep)
+
+            else:
+
+                current_job = client.get_job_queue().popleft()
+                    
             client.set_current_job(current_job)
     
             packet_id = current_job.get_packet_id()
@@ -68,6 +96,9 @@ class NetworkModel:
             match activity_type:
                 case ActivityType.C_START_PROCESSING_SOURCE:
                     self.C_start_processing_source(client,packet_id, activity_type)
+
+                case ActivityType.C_START_PROCESSING_DESTINATION:
+                    self.C_start_processing_destination(client, packet_id, activity_type)
 
                 case ActivityType.C_START_TRANSMISSION:
                     self.C_start_transmission(client, packet_id, activity_type)
@@ -83,7 +114,13 @@ class NetworkModel:
 
     #C_START_PROCESSING_SOURCE
     def C_start_processing_source(self, client: Client, packet_id: int, activity_type: ActivityType):
-        # Implement the logic for processing a source packet
+        #Validação de ACK -> Remoção de pacote do buffer respeitando implementações reais do Selective Repeat
+        # ....
+        # if packet.get_packet_type() == PacketType.ACK:
+        #     print(f"Packet {packet_id} is an ACK. Removing from buffer.")
+        #     return
+
+
         #Verificação se estamos lidando com Source, Destination ou Generic, para alterar a rotina conforme a necessidade    
         if client == self.clients[0]:
             temp = client.get_packet_list().get_packet(packet_id)
@@ -128,6 +165,8 @@ class NetworkModel:
             print(f"Scheduling B_arrival for packet {packet_id} after processing time.")
             self.engine.schedule(cell)
 
+    def C_start_processing_destination(self, client: Client, packet_id: int, activity_type: ActivityType):
+        pass
 
     def C_start_processing_generic(self, client: Client, packet_id: int, activity_type: ActivityType):
         # Implement the logic for processing a generic packet
@@ -222,6 +261,11 @@ class NetworkModel:
             print(f"")
 
 
+            if next_client == self.clients[len(self.clients)-1]:
+                activity_type = ActivityType.C_START_PROCESSING_DESTINATION
+            else:
+                activity_type = ActivityType.C_START_PROCESSING_GENERIC
+
             cell = TimeCell(
                 name = f"{next_client.get_name()} B_arrival ",
                 time = info.get_latencia_simulada(),
@@ -229,7 +273,7 @@ class NetworkModel:
                     self.B_arrival,
                     next_client,
                     packet_id,
-                    ActivityType.C_START_PROCESSING_GENERIC
+                    activity_type
                 )
             )
 

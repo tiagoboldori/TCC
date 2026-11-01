@@ -13,7 +13,7 @@ from src.ApplicationSpecific.config import config_loader
 
 
 class Client:
-    def __init__(self, name: str, data_structure: str, window_size = 5) -> None:
+    def __init__(self, name: str, data_structure: str, window_size = 5, buffer_size = 2) -> None:
 
         self.__name = name
         self.__adj = []
@@ -27,8 +27,23 @@ class Client:
         self.__curent_idx = 0
 
 
-        self.__packet_list = config_loader.DSAs[data_structure]()
+        self.__application_memory = config_loader.DSAs[data_structure]()
 
+        self.__protocol_buffer= config_loader.DSAs[data_structure]()
+        self.__buffer_size = buffer_size
+
+
+    def get_buffer_size(self):
+        return self.__buffer_size
+    
+    def set_buffer_size(self, size):
+        self.__buffer_size = size
+
+    def get_window_size(self):
+        return self.__window_size
+
+    def set_window_size(self, size):
+        self.__window_size = size
 
 
     #Setters e Getters para fila de pacotes
@@ -48,10 +63,23 @@ class Client:
                 self.__job_queue.remove(item)
                 return
 
+            
 
-    # GETTER PARA LISTA DE PACOTES (dsa)
-    def get_packet_list(self):
-        return self.__packet_list
+
+    # GETTER PARA LISTA DE PACOTES (dsa) PROTOCOL BUFFER / APPLICATION MEMORY
+    def get_protocol_buffer(self):
+        return self.__protocol_buffer
+
+    def get_application_memory(self):
+        return self.__application_memory
+
+
+
+    def get_current_idx(self):
+        return self.__curent_idx
+
+    def set_current_idx(self, idx):
+        self.__curent_idx = idx
 
 
 
