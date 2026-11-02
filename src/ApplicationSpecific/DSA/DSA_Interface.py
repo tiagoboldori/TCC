@@ -25,5 +25,10 @@ class DSA_Interface(ABC):
         # Implement the logic to retrieve all packets
         pass
 
+    @abstractmethod
+    def get_size(self) -> int:
+        # Implement the logic to retrieve the size of the data structure
+        pass
+
 
 

@@ -1,3 +1,3 @@
-from .BinaryTree import BinaryTree
-from .DSA_Interface import DSA_Interface
-from .LinkedList import LinkedList
+from src.ApplicationSpecific.DSA.BinaryTree import BinaryTree
+from src.ApplicationSpecific.DSA.DSA_Interface import DSA_Interface
+from src.ApplicationSpecific.DSA.LinkedList import LinkedList

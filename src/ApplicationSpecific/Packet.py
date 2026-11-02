@@ -1,4 +1,4 @@
-from ApplicationSpecific.PacketType import PacketType
+from src.ApplicationSpecific.PacketType import PacketType
 
 class Packet:
     def __init__(self, data: str, packet_type: PacketType = PacketType.DATA):
@@ -13,4 +13,3 @@ class Packet:
 
     def set_data(self, data: str) -> None:
         self.__data = data
-

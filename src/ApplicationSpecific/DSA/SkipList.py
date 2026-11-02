@@ -51,3 +51,7 @@ class SkipList(DSA_Interface):
     def get_all_packets(self):
         return [i[1].get_data() for i in self.items[0]]
 
+
+    def get_size(self):
+        return len(self.items[0])
+
