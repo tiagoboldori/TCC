@@ -24,15 +24,15 @@ class Executive:
 
             self.engine.set_current_time(next_time)
 
-            print("\n=============================\nSimulation Clock = " + str(self.engine.get_current_time()))
+            print(f"\n========== Relógio da simulação: {self.engine.get_current_time():.2f} ==========")
 
             
             # Execução de B activities
             #======= B Phase ========
-            print("\nExecuting B activities...")
+            print("\n[Fase B] Executando eventos agendados...")
             due_cells = self.engine.cells_due_now()
             for cell in due_cells:
-                print(f"Executing cell: {cell.name} at time {cell.time}")
+                print(f"[Fase B][EVENTO] {cell.name} | horário={cell.time:.2f}.")
                 cell.action()
                 cell.time = inf
 
@@ -40,5 +40,5 @@ class Executive:
 
             # Execução de C activities
             #======= C Phase ========
-            print("\nExecuting C activities...")
+            print("\n[Fase C] Processando atividades dos clientes...")
             self.network_model.C_process_all()

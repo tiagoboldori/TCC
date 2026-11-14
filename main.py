@@ -31,7 +31,8 @@ client2 = Client(name="Client2", data_structure="SkipList")
 network_model.clients.append(client2)
 
 
-client1.add_adj(client2, Info(latencia=15, perda=0.5, variancia=0.2))
+client1.add_adj(client2, Info(latencia=5, perda=0.15, variancia=0.25))
+client2.add_adj(client1, Info(latencia=5, perda=0.15, variancia=0.25))
 
 
 #packet = Packet.Packet(data="Packet2")
@@ -44,7 +45,7 @@ activity_type = ActivityType.C_LOAD_PACKET
 
 
 
-print("Inserindo agendamentos arbitrários para testes...\n")
+print("[INICIALIZAÇÃO] Registrando eventos de teste...\n")
 cell = TimeCell(
     name = "B_arrival Client1 Packet1",
     time = 1,
@@ -71,31 +72,30 @@ engine.schedule(cell)
 
 
 
-print("Time Cells/Agendamentos existentes:")
+print("[INICIALIZAÇÃO] Eventos agendados:")
 
 for time_cell in engine.get_time_cells():
-    print(time_cell)
+    print(f"  - {time_cell.name} | horário={time_cell.time:.2f}")
 
-print("\n...\n")
+print()
 
-print("Iniciando Simulação... \n==============================")
+print("\n========== Início da simulação ==========\n")
 
 executive.run(until=1000)
 
-print("\nFim da simulação...\n==============================")
+print("\n========== Fim da simulação ==========\n")
 
 
-print("Resultado dos Clients após simulação:\n==============================")
+print("[RESULTADO] Estado dos clientes:")
 for cli in network_model.clients:
-    print("__________________________")
-    print(f"Client: {cli.get_name()}")
+    print(f"\n[CLIENTE] {cli.get_name()}")
     txt = ""
     while cli.get_job_queue():
         queue_item = cli.get_job_queue().popleft()
         txt+= str(queue_item.get_packet_id()) + " " + queue_item.get_activity_type().name + " "+cli.get_protocol_buffer().get_packet(queue_item.get_packet_id())['packet'].get_data() + " | "
-    print(f"Job Queue: {txt}")
-    print(f"Packets: {cli.get_protocol_buffer().get_all_packets()}")
+    print(f"  Fila de atividades: {txt}")
+    print(f"  Pacotes no buffer de protocolo: {cli.get_protocol_buffer().get_all_packets()}")
 
-print("\nResultado do Router após simulação:\n==============================")
-print(f"Lost Packets: {network_model.get_total_lost_packets()}")
-print(f"Processing Time: {network_model.get_total_processing_time()}")
+print("\n[RESULTADO] Métricas da rede:")
+print(f"  Pacotes perdidos: {network_model.get_total_lost_packets()}")
+print(f"  Tempo total de processamento: {network_model.get_total_processing_time():.2f}")

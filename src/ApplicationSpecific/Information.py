@@ -32,6 +32,7 @@ class Info:
         return max(tempo_calculado, tempo_minimo_fisico)
 
 
+
     def set_perda(self, perda: float) -> None:
         self.__perda = perda
 

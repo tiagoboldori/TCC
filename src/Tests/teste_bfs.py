@@ -11,7 +11,7 @@ from src.SimulationEngine import Simulador
 
 
 print("=" * 50)
-print("TESTE ALEATÓRIO - BFS")
+print(" TESTE ALEATÓRIO DE BUSCA EM LARGURA (BFS) ".center(50))
 print("=" * 50)
 
 roteador = Roteador()
@@ -45,15 +45,15 @@ for origem in clientes:
 # Mostrar o grafo
 # -------------------------
 
-print("\nGRAFO GERADO\n")
+print("\n[TESTE][GRAFO] Topologia gerada:\n")
 
 for cliente in clientes:
-    print(f"{cliente.get_nome()} -> ", end="")
+    print(f"  {cliente.get_nome()} -> ", end="")
 
     adjs = cliente.get_all_adj()
 
     if len(adjs) == 0:
-        print("[]")
+        print("(sem conexões)")
         continue
 
     print(", ".join(adj[0].get_nome() for adj in adjs))
@@ -69,8 +69,8 @@ while origem == destino:
     destino = random.choice(clientes)
 
 print("\n" + "=" * 50)
-print(f"Origem : {origem.get_nome()}")
-print(f"Destino: {destino.get_nome()}")
+print(f"[TESTE][ROTA] Origem:  {origem.get_nome()}")
+print(f"[TESTE][ROTA] Destino: {destino.get_nome()}")
 print("=" * 50)
 
 # -------------------------
@@ -84,11 +84,11 @@ caminho = roteador.bfs(origem, destino)
 # -------------------------
 
 if caminho is None:
-    print("\nNenhum caminho encontrado.")
+    print("\n[TESTE][RESULTADO] Nenhum caminho foi encontrado.")
 else:
-    print("\nCaminho encontrado:")
+    print("\n[TESTE][RESULTADO] Caminho encontrado:")
 
-    print(" -> ".join(cli.get_nome() for cli in caminho))
+    print("  " + " -> ".join(cli.get_nome() for cli in caminho))
 
 
 

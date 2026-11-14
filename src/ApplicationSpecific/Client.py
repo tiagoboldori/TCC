@@ -24,7 +24,10 @@ class Client:
         self.__next_job = 0
 
         self.__window_size = window_size
-        self.__curent_idx = 0
+        self.__current_idx = 0
+        # 0 -> nao confirmado
+        # 1 -> confirmado
+        self.__retransmission_window = [0 for i in range (self.__window_size)]
 
 
         self.__application_memory = config_loader.DSAs[data_structure]()
@@ -44,6 +47,12 @@ class Client:
 
     def set_window_size(self, size):
         self.__window_size = size
+
+    def get_retransmission_window(self):
+        return self.__retransmission_window
+
+    def set_retransmission_window(self, window):
+        self.__retransmission_window = window
 
 
     #Setters e Getters para fila de pacotes
@@ -76,10 +85,10 @@ class Client:
 
 
     def get_current_idx(self):
-        return self.__curent_idx
+        return self.__current_idx
 
     def set_current_idx(self, idx):
-        self.__curent_idx = idx
+        self.__current_idx = idx
 
 
 

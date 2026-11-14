@@ -7,6 +7,13 @@ from src.ApplicationSpecific.ActivityType import ActivityType
 from src.ApplicationSpecific.Information import Info
 from src.Engine import TimeCell
 
+    
+#PENDENTE: Validar funcionamento geral / testes;
+# Implementar NACK e afins
+# Implementar calculo de Timeout razoavel
+# Pesquisar tempo que um PC demora a realizar a transmissao fisica (disparar o pulso)
+        
+
 
 class NetworkModel:
     def __init__(self, router, engine):
@@ -53,81 +60,99 @@ class NetworkModel:
     # Janela deslizante respeitando a regra de seq_number (Ver kurose e ross)
     # Timeout para cada pacote nao confirmado dentro da janela 
     # fluxo de ACK e NACK (ver kurose e ross)
-
-
     def C_process_all(self):
-        #ADICIONAR VERIFICACAO POR PACOTES DISPONIVEIS NA APLICAÇÃO (verificar se há espaço no buffer de memória do selective repeat)
         for client in self.clients:
             self.C_process(client)
 
 
     def C_process(self, client: Client):
 
-        if not client.get_is_busy() and len(client.get_job_queue()) > 0:
+        if client.get_is_busy() or len(client.get_job_queue()) == 0:
+            return
 
 
-            # VALIDAÇÂO PARA PACKET_LOAD
-            # Packet load deve respeitar tamanho do buffer do protocolo
-            # Caso não haja espaço, busca o proximo evento tipo C que não seja do tipo LOAD_PACKET
-            # Falta: implementar evento do load packet, trocar referencias antigas (packet_list) para o buffer do protocolo (protocol_buffer)
-            # trocar implementação atual para que processamentos busquem do buffer do protocolo na origem e no destino
-            # fazer com que processamento de atividade C load packet busque do application memory e insira diretamente no protocol buffer
-            
-            # no mais: durante transmissao deve ser gerado evento B para timeout individual do pacote
-            # durante processamento de pacote ACK deve-se remover o timeout do pacote enviado
-            # ao receber pacote NACK deve-se remanejar timeout agendado
-            if client.get_job_queue()[0].get_activity_type() == ActivityType.C_LOAD_PACKET and client.get_protocol_buffer().get_size() >= client.get_buffer_size():
-                    
-                    keep = client.get_job_queue()
 
-                    while client.get_job_queue():
-                            current_job = client.get_job_queue().popleft()
-                            if current_job.get_activity_type() != ActivityType.C_LOAD_PACKET:
-                                break
-                            else:
-                                keep.append(current_job)
-
-                    client.set_job_queue(keep)
-
-            else:
-
-                current_job = client.get_job_queue().popleft()
-                    
-            client.set_current_job(current_job)
     
-            packet_id = current_job.get_packet_id()
-            activity_type = current_job.get_activity_type()
+        #verificação para atividade LOAD_PACKET
+        queue = client.get_job_queue()
+        if queue[0].get_activity_type() == ActivityType.C_LOAD_PACKET and client.get_protocol_buffer().get_size() >= client.get_buffer_size():
+            for _ in range(len(queue)):
+                current_job = queue.popleft()
+                if current_job.get_activity_type() != ActivityType.C_LOAD_PACKET:
+                    break
+                queue.append(current_job)
+            else:
+                print(
+                    f"[C][ADIADO] Cliente {client.get_name()}: buffer de protocolo cheio "
+                    f"({client.get_protocol_buffer().get_size()}/{client.get_buffer_size()}); "
+                    "pacotes aguardam espaço."
+                )
+                return
 
-            client.set_current_job(current_job)
-            client.set_is_busy(True)
+        else:
+
+            current_job = queue.popleft()
+                
+        client.set_current_job(current_job)
+
+        packet_id = current_job.get_packet_id()
+        activity_type = current_job.get_activity_type()
+
+        client.set_current_job(current_job)
+        client.set_is_busy(True)
 
 
-            match activity_type:
-                case ActivityType.C_START_TRANSMISSION:
-                    self.C_start_transmission(client, packet_id, activity_type)
+        match activity_type:
+            case ActivityType.C_START_TRANSMISSION:
+                self.C_start_transmission(client, packet_id, activity_type)
+            
+            case ActivityType.C_START_TRANSMISSION_INVERTED:
+                self.C_start_transmission_inverted(client, packet_id, activity_type)
 
-                case ActivityType.C_START_PROCESSING_GENERIC:
-                    # valor arbitrario de processamento obtido a partir de uma distribuicao uniforme + tempo da DSA usada * distribuicao uniforme arbitraria de 1.0 até 1.5 (para source / destination)
-                    if client == self.clients[0]:
-                        self.C_start_processing_source(client, packet_id, activity_type)
-                        
-                    elif client == self.clients[len(self.clients)-1]:
-                        self.C_start_processing_destination(client, packet_id, activity_type)
+            case ActivityType.C_START_PROCESSING_GENERIC:
+                # valor arbitrario de processamento obtido a partir de uma distribuicao uniforme + tempo da DSA usada * distribuicao uniforme arbitraria de 1.0 até 1.5 (para source / destination)
+                if client == self.clients[0]:
+                    self.C_start_processing_source(client, packet_id, activity_type)
                     
-                    else:
-                        self.C_start_processing_generic(client, packet_id, activity_type)
+                elif client == self.clients[len(self.clients)-1]:
+                    self.C_start_processing_destination(client, packet_id, activity_type)
+                
+                else:
+                    self.C_start_processing_generic(client, packet_id, activity_type)
+                
+            case ActivityType.C_START_PROCESSING_GENERIC_INVERTED:
+                if client == self.clients[0]:
+                    self.C_start_processing_source(client, packet_id, activity_type)
                     
-                case ActivityType.C_LOAD_PACKET:
-                    self.C_load_packet(client, packet_id, activity_type)
-                                        
-                case _:
-                    raise ValueError(f"Invalid activity type: {activity_type}")
+                elif client == self.clients[len(self.clients)-1]:
+                    self.C_start_processing_destination(client, packet_id, activity_type)
+                
+                else:
+                    self.C_start_processing_generic(client, packet_id, activity_type, inverted=True)
+
+            case ActivityType.C_LOAD_PACKET:
+                self.C_load_packet(client, packet_id, activity_type)
+
+            case ActivityType.C_PROCESS_ACK:
+                self.C_process_ack(client, packet_id)
+
+            case ActivityType.C_PROCESS_NACK:
+                self.C_process_nack(client, packet_id)
+
+            case ActivityType.C_PROCESS_TIMEOUT:
+                self.C_process_timeout(client, packet_id)
+                                    
+            case _:
+                raise ValueError(f"Invalid activity type: {activity_type}")
 
 
     def C_load_packet(self, client: Client, packet_id: int, activity_type: ActivityType):
         #Considera-se apenas pegar um pacote de id:X da memoria da aplicação e duplica-lo para o buffer do protocolo com o mesmo id:X, para que seja transmitido posteriormente
         
-        print(f"Starting Activity {activity_type}\nLoading packet {packet_id} from application memory to protocol buffer...")
+        print(
+            f"[C][CARREGAMENTO] Cliente {client.get_name()}: iniciando atividade "
+            f"{activity_type.name} para pacote #{packet_id}."
+        )
         
         packet = client.get_application_memory().get_packet(packet_id)['packet']
         client.get_protocol_buffer().add_packet(packet_id, packet)
@@ -142,7 +167,7 @@ class NetworkModel:
         )
         self.engine.schedule(cell)
 
-        print(f"Scheduled B_departure for activity {cell.name} at time {self.engine.get_current_time() + 1:.2f}.")
+        print(f"[B][AGENDADO] {cell.name.strip()} | horário={cell.time:.2f}.")
 
         client.add_to_queue(packet_id, ActivityType.C_START_PROCESSING_GENERIC)
 
@@ -150,11 +175,84 @@ class NetworkModel:
     #C_START_PROCESSING_SOURCE
     def C_start_processing_source(self, client: Client, packet_id: int, activity_type: ActivityType):
         #Validação de ACK -> Remoção de pacote do buffer respeitando implementações reais do Selective Repeat
-        # ....
-        # if packet.get_packet_type() == PacketType.ACK:
-        #     print(f"Packet {packet_id} is an ACK. Removing from buffer.")
-        #     return
+        # Validação de ACK / NACK será feita usando IDs Arbitrários de pacotes. -1000 - package_id -> ACK, -2000 - package_id -> NACK
+        # Implementar timeout para cada pacote enviado, caso não haja confirmação de recebimento (ACK)
 
+        if packet_id <= -1000 and packet_id > -2000:
+            id = -1*(packet_id+1000)
+            print(
+                f"[C][ACK] Cliente {client.get_name()}: ACK do pacote #{id} recebido; "
+                "atualizando janela de retransmissão."
+            )
+            window = client.get_retransmission_window()
+            window[id] = 1
+
+            aux = 0
+            for i in range(len(window)):
+                if window[i] == 0:
+                    aux+=1 
+
+            if aux == 0:
+                print(
+                    f"[C][JANELA] Cliente {client.get_name()}: todos os pacotes foram "
+                    "confirmados; avançando a janela."
+                )
+                client.set_retransmission_window([0 for i in range (client.get_window_size())])
+                client.set_current_idx(client.get_current_idx() + client.get_window_size())
+
+            cell = TimeCell(
+                name = f"{client.get_name()} B_departure",
+                time = 0.5,
+                action = partial(
+                    self.B_departure,
+                    client
+                )
+            )
+
+            self.engine.schedule(cell)
+
+            return
+
+        #NACK package
+        elif packet_id <= -2000:
+            id = -1*(packet_id+2000)
+            print(
+                f"[C][NACK] Cliente {client.get_name()}: NACK do pacote #{id} recebido; "
+                "agendando retransmissão."
+            )
+            window = client.get_retransmission_window()
+            window[id] = 0
+
+            cell = TimeCell(
+                name = f"{client.get_name()} B_departure for C_process_nack",
+                time = 0.5,
+                action = partial(
+                    self.B_departure,
+                    client
+                )
+            )
+
+            self.engine.schedule(cell)
+
+            #start_transmission routine
+            cell = TimeCell(
+                name = f"{client.get_name()} B_arrival for C_start_transmission",
+                time = 0.5,
+                action = partial(
+                    self.B_arrival,
+                    client,
+                    packet_id,
+                    ActivityType.C_START_TRANSMISSION
+                )
+            )
+            print(f"[B][AGENDADO] Retransmissão do pacote #{packet_id} em 0.50 unidade de tempo.")
+
+            self.engine.schedule(cell)
+
+            return
+
+        #GENERIC PACKAGE
+        # PACKAGE != ACK / NACK
         temp = client.get_protocol_buffer().get_packet(packet_id)
         packet = temp["packet"]
         time = temp["time"]
@@ -164,12 +262,14 @@ class NetworkModel:
         self.set_total_processing_time(self.get_total_processing_time() + processing_time)
 
 
-
-        print(f"Client {client.get_name()} is processing packet {packet_id} with activity type {activity_type} for {processing_time:.2f} time units.")
+        print(
+            f"[C][PROCESSAMENTO] Cliente {client.get_name()}: pacote #{packet_id}, "
+            f"atividade={activity_type.name}, duração={processing_time:.2f}."
+        )
 
         
         cell = TimeCell(
-            name = f"{client.get_name()} B_departure ",
+            name = f"{client.get_name()} B_departure for C_start_processing",
             time = processing_time,
             action = partial(
                 self.B_departure,
@@ -180,12 +280,11 @@ class NetworkModel:
         self.engine.schedule(cell)
 
             
-        print(f"Scheduled B_departure for activity {cell.name} at time {self.engine.get_current_time() + processing_time:.2f}.")
-        print(f"")
+        print(f"[B][AGENDADO] {cell.name.strip()} | horário={cell.time:.2f}.")
 
         #start_transmission routine
         cell = TimeCell(
-            name = f"{client.get_name()} B_arrival ",
+            name = f"{client.get_name()} B_arrival for C_start_transmission",
             time = processing_time,
             action = partial(
                 self.B_arrival,
@@ -194,16 +293,32 @@ class NetworkModel:
                 ActivityType.C_START_TRANSMISSION
             )
         )
-        print(f"Scheduling B_arrival for packet {packet_id} after processing time.")
+        print(
+            f"[B][AGENDADO] {cell.name.strip()} para o pacote #{packet_id} "
+            f"| horário={cell.time:.2f}."
+        )
         self.engine.schedule(cell)
 
 
 
     def C_start_processing_destination(self, client: Client, packet_id: int, activity_type: ActivityType):
+        #Transmissão de ACK para o source
+        cell = TimeCell(
+            name = f"{client.get_name()} B_arrival ",
+            time = 0.5,  
+            action = partial(
+                self.B_arrival,
+                client,
+                (packet_id+1000)*-1,
+                ActivityType.C_START_TRANSMISSION_INVERTED
+            )
+        )
+        self.engine.schedule(cell)
+
 
         cell = TimeCell(
             name = f"{client.get_name()} B_departure ",
-            time = 1,  # Arbitrary processing time for destination processing
+            time = 0.5,  # Arbitrary processing time for destination processing
             action = partial(
                 self.B_departure,
                 client
@@ -211,22 +326,25 @@ class NetworkModel:
         )
 
         self.engine.schedule(cell)
+        print(f"[B][AGENDADO] {cell.name.strip()} | horário={cell.time:.2f}.")
 
 
 
-    def C_start_processing_generic(self, client: Client, packet_id: int, activity_type: ActivityType):
-        # Implement the logic for processing a generic packet
+    def C_start_processing_generic(self, client: Client, packet_id: int, activity_type: ActivityType, inverted=False):
+        
         temp = client.get_protocol_buffer().get_packet(packet_id)
         packet = temp["packet"]
         time = temp["time"]
-        processing_time = random.uniform(1,3) + time * random.uniform(1.0, 1.5)
+        processing_time =  time * random.uniform(1.0, 1.5)
 
         #metrics
         self.set_total_processing_time(self.get_total_processing_time() + processing_time)
 
-        print(f"Client {client.get_name()} is processing packet {packet_id} with activity type {activity_type} for {processing_time:.2f} time units.")
+        print(
+            f"[C][PROCESSAMENTO] Cliente {client.get_name()}: pacote #{packet_id}, "
+            f"atividade={activity_type.name}, duração={processing_time:.2f}."
+        )
 
-        
         cell = TimeCell(
             name = f"{client.get_name()} B_departure ",
             time = processing_time,
@@ -239,34 +357,58 @@ class NetworkModel:
         self.engine.schedule(cell)
 
             
-        print(f"Scheduled B_departure for activity {cell.name} at time {self.engine.get_current_time() + processing_time:.2f}.")
-        print(f"")
+        print(f"[B][AGENDADO] {cell.name.strip()} | horário={cell.time:.2f}.")
 
-        #start_transmission routine
-        cell = TimeCell(
-            name = f"{client.get_name()} B_arrival ",
-            time = processing_time,
-            action = partial(
-                self.B_arrival,
-                client,
-                packet_id,
-                ActivityType.C_START_TRANSMISSION
+        
+        if inverted:
+            print(
+                f"[C][PROCESSAMENTO INVERSO] Pacote #{packet_id} processado por "
+                f"{client.get_name()}; retorno ao cliente anterior."
             )
+            cell = TimeCell(
+                name = f"{client.get_name()} B_arrival ",
+                time = processing_time,
+                action = partial(
+                    self.B_arrival,
+                    client,
+                    packet_id,
+                    ActivityType.C_START_TRANSMISSION_INVERTED
+                )
+            )
+
+        else:
+        #start_transmission routine
+            cell = TimeCell(
+                name = f"{client.get_name()} B_arrival ",
+                time = processing_time,
+                action = partial(
+                    self.B_arrival,
+                    client,
+                    packet_id,
+                    ActivityType.C_START_TRANSMISSION
+                )
+            )
+        print(
+            f"[B][AGENDADO] {cell.name.strip()} para o pacote #{packet_id} "
+            f"| horário={cell.time:.2f}."
         )
-        print(f"Scheduling B_arrival for packet {packet_id} after processing time.")
         self.engine.schedule(cell)
 
 
-    def C_start_transmission(self, client: Client, packet_id: int, activity_type: ActivityType):
-
-        #implementar janela deslizante confimação (ACK e NACK)
+    def C_start_transmission(self, client: Client, packet_id: int, activity_type: ActivityType ):
         if client == self.clients[len(self.clients)-1]:
-            print(f"Client {client.get_name()} is the last client in the network. No next client to transmit to.")
+            print(
+                f"[C][TRANSMISSÃO] Cliente {client.get_name()} é o destino; "
+                f"não há próximo salto para o pacote #{packet_id}."
+            )
             return
 
 
         # A FAZER: ADICIONAR TEMPO DE PROCESSAMENTO PARA ATIVIDADE
-        print(f"Client {client.get_name()} is starting transmission for packet {packet_id} with activity type {activity_type} at time {self.engine.get_current_time():.2f}.")
+        print(
+            f"[C][TRANSMISSÃO] Cliente {client.get_name()} iniciou o envio do pacote "
+            f"#{packet_id} (atividade={activity_type.name}) | horário={self.engine.get_current_time():.2f}."
+        )
         #print(f"Scheduling B_departure for packet {packet_id} after transmission time.")
 
         idx = self.clients.index(client)
@@ -281,10 +423,10 @@ class NetworkModel:
                     break
 
             # PESQUISAR SOBRE TEMPO DE ENVIO / PROCESSAMENTO PARA ESTE CASO EM ESPECIFICO PARA BASE DE SIMULACAO MELHOR
-            # Atualmente agendado para 1 ut no futuro de forma arbitraria.
+            # Atualmente agendado para 0.5 ut no futuro de forma arbitraria.
             cell = TimeCell(
                 name = f"{client.get_name()} B_departure ",
-                time = 1,
+                time = 0.5,
                 action = partial(
                     self.B_departure,
                     client
@@ -293,23 +435,38 @@ class NetworkModel:
 
             self.engine.schedule(cell)    
 
+            print(f"[B][AGENDADO] {cell.name.strip()} | horário={cell.time:.2f}.")
+
+
+            #AGENDAMENTO DE TIMEOUT
+            #valor arbitrario temporario
+            latencia_total = 25
+            cell = TimeCell(
+                name = f"{client.get_name()} B_arrival",
+                time =  latencia_total,
+                action = partial(
+                    self.B_arrival,
+                    client,
+                    packet_id,
+                    ActivityType.C_PROCESS_TIMEOUT
+                )
+            )
+            self.engine.schedule(cell)
+            print(f"[B][TIMEOUT] {cell.name.strip()} | horário={cell.time:.2f}.")
+
             if info.get_perda() > random.random():
-                print(f"Packet {packet_id} lost during transmission from {client.get_name()} to {next_client.get_name()}.")
+                print(
+                    f"[REDE][PERDA] Pacote #{packet_id} perdido no enlace "
+                    f"{client.get_name()} -> {next_client.get_name()}."
+                )
                 self.set_total_lost_packets(self.get_total_lost_packets() + 1)
                 return
-            
-            
-
-            
-                
-            print(f"Scheduled B_departure for current Transmission Activity {cell.name} at time {self.engine.get_current_time()+2} ")
-            print(f"")
 
 
             activity_type = ActivityType.C_START_PROCESSING_GENERIC
 
             cell = TimeCell(
-                name = f"{next_client.get_name()} B_arrival ",
+                name = f"{next_client.get_name()} B_arrival",
                 time = info.get_latencia_simulada(),
                 action = partial(
                     self.B_arrival,
@@ -323,12 +480,187 @@ class NetworkModel:
 
             next_client.get_protocol_buffer().add_packet(packet_id, client.get_protocol_buffer().get_packet(packet_id)["packet"])
             
-            print(f"Scheduled B_arrival for activity {cell.name} at time {self.engine.get_current_time() + info.get_latencia_simulada():.2f}. at client {next_client.get_name()}.")
+            print(
+                f"[B][AGENDADO] {cell.name.strip()} no cliente {next_client.get_name()} "
+                f"| horário={cell.time:.2f}."
+            )
 
+
+            
 
 
         else:
-            #adicionar B_departure para caso abaixo
-            print(f"Client {client.get_name()} is the last client in the network. No next client to transmit to.")
+            print(
+                f"[C][TRANSMISSÃO] Cliente {client.get_name()} é a origem; "
+                f"não há cliente anterior para o pacote #{packet_id}."
+            )
+            raise ValueError("No vertex.")
+     
+
+    def C_start_transmission_inverted(self, client: Client, packet_id: int, activity_type: ActivityType ):
+        if client == self.clients[0]:
+            print(
+                f"[C][TRANSMISSÃO INVERSA] Cliente {client.get_name()} é a origem; "
+                f"não há cliente anterior para o pacote #{packet_id}."
+            )
+            return
+
+
+        # A FAZER: ADICIONAR TEMPO DE PROCESSAMENTO PARA ATIVIDADE
+        print(
+            f"[C][TRANSMISSÃO INVERSA] Cliente {client.get_name()} iniciou o envio do "
+            f"pacote #{packet_id} (atividade={activity_type.name}) "
+            f"| horário={self.engine.get_current_time():.2f}."
+        )
+
+        idx = self.clients.index(client)
+
+        adj = client.get_all_adj()
+
+        if idx <= len(self.clients) - 1 and idx > 0:
+            next_client = self.clients[idx-1]
+            for a in adj:
+                if a[0] == next_client:
+                    info = a[1]
+                    break
+
+            # PESQUISAR SOBRE TEMPO DE ENVIO / PROCESSAMENTO PARA ESTE CASO EM ESPECIFICO PARA BASE DE SIMULACAO MELHOR
+            # Atualmente agendado para 0.5 ut no futuro de forma arbitraria.
+            cell = TimeCell(
+                name = f"{client.get_name()} B_departure ",
+                time = 0.5,
+                action = partial(
+                    self.B_departure,
+                    client
+                )
+            )
+
+            self.engine.schedule(cell)    
+
+            print(f"[B][AGENDADO] {cell.name.strip()} | horário={cell.time:.2f}.")
+
+            if info.get_perda() > random.random():
+                print(
+                    f"[REDE][PERDA] Pacote #{packet_id} perdido no enlace inverso "
+                    f"{client.get_name()} -> {next_client.get_name()}."
+                )
+                self.set_total_lost_packets(self.get_total_lost_packets() + 1)
+                return
+
+
+            activity_type = ActivityType.C_START_PROCESSING_GENERIC_INVERTED
+
+            cell = TimeCell(
+                name = f"{next_client.get_name()} B_arrival",
+                time = info.get_latencia_simulada(),
+                action = partial(
+                    self.B_arrival,
+                    next_client,
+                    packet_id,
+                    activity_type
+                )
+            )
+
+            self.engine.schedule(cell)
+
+            if packet_id >= 0:
+                next_client.get_protocol_buffer().add_packet(
+                    packet_id,
+                    client.get_protocol_buffer().get_packet(packet_id)["packet"]
+                )
+            
+            print(
+                f"[B][AGENDADO] {cell.name.strip()} no cliente {next_client.get_name()} "
+                f"| horário={cell.time:.2f}."
+            )
+
+
+        else:
+            print(
+                f"[C][TRANSMISSÃO INVERSA] Cliente {client.get_name()} é a origem; "
+                f"não há cliente anterior para o pacote #{packet_id}."
+            )
             raise ValueError("No vertex.")
         
+
+
+    def C_process_ack(self, client: Client, packet_id: int):
+        print(
+            f"[C][ACK] Cliente {client.get_name()}: confirmação do pacote #{packet_id} "
+            "recebida; removendo do buffer de protocolo."
+        )
+        client.get_protocol_buffer().remove_packet(packet_id)
+
+        cell = TimeCell(
+            name = f"{client.get_name()} B_departure for C_process_ack",
+            time = 0.5,
+            action = partial(
+                self.B_departure,
+                client
+            )
+        )
+
+        self.engine.schedule(cell)   
+
+
+    def C_process_nack(self, client: Client, packet_id: int):
+        print(
+            f"[C][NACK] Cliente {client.get_name()}: solicitação de retransmissão "
+            f"recebida para o pacote #{packet_id}."
+        )
+        # Logic to retransmit the packet can be added here
+
+        cell = TimeCell(
+            name = f"{client.get_name()} B_departure for C_process_nack",
+            time = 0.5,
+            action = partial(
+                self.B_departure,
+                client
+            )
+        )
+
+        self.engine.schedule(cell)
+
+
+    
+    def C_process_timeout(self, client: Client, packet_id: int):
+        print(
+            f"[C][TIMEOUT] Cliente {client.get_name()}: expirou o tempo de confirmação "
+            f"do pacote #{packet_id}."
+        )
+        # Logic to retransmit the packet can be added here
+        
+        if client.get_retransmission_window()[packet_id] == 1:
+            print(
+                f"[C][TIMEOUT] Pacote #{packet_id} já foi confirmado; "
+                "retransmissão desnecessária."
+            )
+
+        else:
+            cell = TimeCell(
+                name = f"{client.get_name()} B_arrival",
+                time = 0.1,
+                action = partial(
+                    self.B_arrival,
+                    client,
+                    packet_id,
+                    ActivityType.C_START_PROCESSING_GENERIC
+                )
+            )
+            self.engine.schedule(cell)
+            print(
+                f"[B][AGENDADO] Retransmissão do pacote #{packet_id} "
+                f"| horário={cell.time:.2f}."
+            )
+        
+        cell = TimeCell(
+            name = f"{client.get_name()} B_departure",
+            time = 0.5,
+            action = partial(
+                self.B_departure,
+                client
+            )
+        )
+
+        self.engine.schedule(cell)
+        print(f"[B][AGENDADO] {cell.name.strip()} | horário={cell.time:.2f}.")

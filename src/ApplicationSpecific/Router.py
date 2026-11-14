@@ -41,7 +41,7 @@ class Router:
             return None
 
         if len(fila) == 0:
-            print("Caminho não encontrado")
+            print("[ROTEADOR][BFS] Não foi encontrado um caminho entre a origem e o destino.")
             return None
 
         while len(fila) > 0:
@@ -62,5 +62,5 @@ class Router:
                     cli_adj.ant = cli_atual
                     fila.append(cli_adj)
 
-        print("Sem caminho encontrado")
+        print("[ROTEADOR][BFS] Busca concluída sem encontrar um caminho até o destino.")
         return
