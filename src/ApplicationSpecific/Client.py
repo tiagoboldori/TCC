@@ -13,7 +13,7 @@ from src.ApplicationSpecific.config import config_loader
 
 
 class Client:
-    def __init__(self, name: str, data_structure: str, window_size = 5, buffer_size = 2) -> None:
+    def __init__(self, name: str, data_structure: str, window_size = 1, buffer_size = 2) -> None:
 
         self.__name = name
         self.__adj = []
@@ -65,6 +65,9 @@ class Client:
 
     def add_to_queue(self, packet_id, activity_type):
         self.__job_queue.append(QueueItem(packet_id, activity_type))
+
+    def enqueue(self, packet_id, activity_type):
+        self.__job_queue.appendleft(QueueItem(packet_id, activity_type))
 
     def remove_from_queue(self, queueItem):
         for item in self.__job_queue:

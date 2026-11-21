@@ -3,6 +3,7 @@ from functools import partial
 import random
 
 from src.ApplicationSpecific.Client import Client
+from src.ApplicationSpecific.helpers import *
 from src.ApplicationSpecific.ActivityType import ActivityType
 from src.ApplicationSpecific.Information import Info
 from src.Engine import TimeCell
@@ -37,14 +38,21 @@ class NetworkModel:
     
     def get_total_lost_packets(self):
         return self.__total_lost_packets
-
     def set_total_lost_packets(self, total_lost_packets):
         self.__total_lost_packets = total_lost_packets
+
+    def get_clients(self):
+        return self.clients
 
     #Processamento de atividades B
     #Packet ID é o equivalente ao seq_number do pacote
     def B_arrival(self, client,  packet_id: int, activity_type: ActivityType):
-        client.add_to_queue(packet_id, activity_type)
+        if activity_type == ActivityType.C_START_TRANSMISSION or activity_type == ActivityType.C_START_TRANSMISSION_INVERTED:
+            client.enqueue(packet_id, activity_type)
+
+        else:
+            client.add_to_queue(packet_id, activity_type)
+
 
 
     def B_departure(self, client: Client):
@@ -73,8 +81,11 @@ class NetworkModel:
 
 
     
-        #verificação para atividade LOAD_PACKET
+        #verificação para atividade LOAD_PACKET (tamanho do buffer de protocolo) -> caso o buffer esteja cheio, adiar a atividade de carregamento de pacotes
         queue = client.get_job_queue()
+
+
+
         if queue[0].get_activity_type() == ActivityType.C_LOAD_PACKET and client.get_protocol_buffer().get_size() >= client.get_buffer_size():
             for _ in range(len(queue)):
                 current_job = queue.popleft()
@@ -178,31 +189,40 @@ class NetworkModel:
         # Validação de ACK / NACK será feita usando IDs Arbitrários de pacotes. -1000 - package_id -> ACK, -2000 - package_id -> NACK
         # Implementar timeout para cada pacote enviado, caso não haja confirmação de recebimento (ACK)
 
+
+        #POLIR para confirmacao de primeiro pacote da janela
+        #Caso ACK (de acordo com nossa convenção de IDs arbitrários)
         if packet_id <= -1000 and packet_id > -2000:
-            id = -1*(packet_id+1000)
+            id = -packet_id - 1000
+            window = client.get_retransmission_window()
+            window_index = id - client.get_current_idx()
+            if not 0 <= window_index < len(window):
+                print(
+                    f"[C][ACK] Cliente {client.get_name()}: ACK do pacote #{id} "
+                    "fora da janela atual; ignorando."
+                )
+                self.engine.schedule(TimeCell(
+                    name=f"{client.get_name()} B_departure",
+                    time=0,
+                    action=partial(self.B_departure, client),
+                ))
+                return
+
             print(
                 f"[C][ACK] Cliente {client.get_name()}: ACK do pacote #{id} recebido; "
                 "atualizando janela de retransmissão."
             )
-            window = client.get_retransmission_window()
-            window[id] = 1
+            window[window_index] = 1
+            client.get_protocol_buffer().remove_packet(id)
 
-            aux = 0
-            for i in range(len(window)):
-                if window[i] == 0:
-                    aux+=1 
-
-            if aux == 0:
-                print(
-                    f"[C][JANELA] Cliente {client.get_name()}: todos os pacotes foram "
-                    "confirmados; avançando a janela."
-                )
-                client.set_retransmission_window([0 for i in range (client.get_window_size())])
-                client.set_current_idx(client.get_current_idx() + client.get_window_size())
+            while window and window[0] == 1:
+                window.pop(0)
+                window.append(0)
+                client.set_current_idx(client.get_current_idx() + 1)
 
             cell = TimeCell(
                 name = f"{client.get_name()} B_departure",
-                time = 0.5,
+                time = 0,
                 action = partial(
                     self.B_departure,
                     client
@@ -213,15 +233,42 @@ class NetworkModel:
 
             return
 
-        #NACK package
+
+
+        # caso NACK package
         elif packet_id <= -2000:
-            id = -1*(packet_id+2000)
+            id = -packet_id - 2000
+            window = client.get_retransmission_window()
+            window_index = id - client.get_current_idx()
+            if not 0 <= window_index < len(window):
+                print(
+                    f"[C][NACK] Cliente {client.get_name()}: NACK do pacote #{id} "
+                    "fora da janela atual; ignorando."
+                )
+                self.engine.schedule(TimeCell(
+                    name=f"{client.get_name()} B_departure for C_process_nack",
+                    time=0,
+                    action=partial(self.B_departure, client),
+                ))
+                return
+
+            if window[window_index] == 1:
+                print(
+                    f"[C][NACK] Cliente {client.get_name()}: pacote #{id} já foi "
+                    "confirmado; ignorando NACK duplicado."
+                )
+                self.engine.schedule(TimeCell(
+                    name=f"{client.get_name()} B_departure for C_process_nack",
+                    time=0,
+                    action=partial(self.B_departure, client),
+                ))
+                return
+
             print(
                 f"[C][NACK] Cliente {client.get_name()}: NACK do pacote #{id} recebido; "
                 "agendando retransmissão."
             )
-            window = client.get_retransmission_window()
-            window[id] = 0
+            window[window_index] = 0
 
             cell = TimeCell(
                 name = f"{client.get_name()} B_departure for C_process_nack",
@@ -241,15 +288,16 @@ class NetworkModel:
                 action = partial(
                     self.B_arrival,
                     client,
-                    packet_id,
+                    id,
                     ActivityType.C_START_TRANSMISSION
                 )
             )
-            print(f"[B][AGENDADO] Retransmissão do pacote #{packet_id} em 0.50 unidade de tempo.")
+            print(f"[B][AGENDADO] Retransmissão do pacote #{id} em 0.50 unidade de tempo.")
 
             self.engine.schedule(cell)
 
             return
+
 
         #GENERIC PACKAGE
         # PACKAGE != ACK / NACK
@@ -302,10 +350,12 @@ class NetworkModel:
 
 
     def C_start_processing_destination(self, client: Client, packet_id: int, activity_type: ActivityType):
+        processing_time = 0
+
         #Transmissão de ACK para o source
         cell = TimeCell(
             name = f"{client.get_name()} B_arrival ",
-            time = 0.5,  
+            time = processing_time,  
             action = partial(
                 self.B_arrival,
                 client,
@@ -318,7 +368,7 @@ class NetworkModel:
 
         cell = TimeCell(
             name = f"{client.get_name()} B_departure ",
-            time = 0.5,  # Arbitrary processing time for destination processing
+            time = processing_time,
             action = partial(
                 self.B_departure,
                 client
@@ -423,10 +473,10 @@ class NetworkModel:
                     break
 
             # PESQUISAR SOBRE TEMPO DE ENVIO / PROCESSAMENTO PARA ESTE CASO EM ESPECIFICO PARA BASE DE SIMULACAO MELHOR
-            # Atualmente agendado para 0.5 ut no futuro de forma arbitraria.
+            # Usando 0 ut para evitar simular NIC e processamento em paralelo como ocorre em cenários reais
             cell = TimeCell(
                 name = f"{client.get_name()} B_departure ",
-                time = 0.5,
+                time = 0,
                 action = partial(
                     self.B_departure,
                     client
@@ -440,19 +490,20 @@ class NetworkModel:
 
             #AGENDAMENTO DE TIMEOUT
             #valor arbitrario temporario
-            latencia_total = 25
-            cell = TimeCell(
-                name = f"{client.get_name()} B_arrival",
-                time =  latencia_total,
-                action = partial(
-                    self.B_arrival,
-                    client,
-                    packet_id,
-                    ActivityType.C_PROCESS_TIMEOUT
+            if client == self.clients[0]:
+                latencia_total = rtt(self) 
+                cell = TimeCell(
+                    name = f"{client.get_name()} B_arrival",
+                    time =  latencia_total,
+                    action = partial(
+                        self.B_arrival,
+                        client,
+                        packet_id,
+                        ActivityType.C_PROCESS_TIMEOUT
+                    )
                 )
-            )
-            self.engine.schedule(cell)
-            print(f"[B][TIMEOUT] {cell.name.strip()} | horário={cell.time:.2f}.")
+                self.engine.schedule(cell)
+                print(f"[B][TIMEOUT] {cell.name.strip()} | horário={cell.time:.2f}.")
 
             if info.get_perda() > random.random():
                 print(
@@ -629,8 +680,14 @@ class NetworkModel:
             f"do pacote #{packet_id}."
         )
         # Logic to retransmit the packet can be added here
-        
-        if client.get_retransmission_window()[packet_id] == 1:
+        window = client.get_retransmission_window()
+        window_index = packet_id - client.get_current_idx()
+        if not 0 <= window_index < len(window):
+            print(
+                f"[C][TIMEOUT] Pacote #{packet_id} já não pertence à janela atual; "
+                "retransmissão ignorada."
+            )
+        elif window[window_index] == 1:
             print(
                 f"[C][TIMEOUT] Pacote #{packet_id} já foi confirmado; "
                 "retransmissão desnecessária."
