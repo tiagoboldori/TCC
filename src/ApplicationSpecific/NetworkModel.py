@@ -13,7 +13,9 @@ from src.Engine import TimeCell
 # Implementar NACK e afins
 # Implementar calculo de Timeout razoavel
 # Pesquisar tempo que um PC demora a realizar a transmissao fisica (disparar o pulso)
-        
+
+ACK_OFFSET = 1_000_000
+NACK_OFFSET = 2_000_000
 
 
 class NetworkModel:
@@ -180,8 +182,8 @@ class NetworkModel:
 
         #POLIR para confirmacao de primeiro pacote da janela
         #Caso ACK (de acordo com nossa convenção de IDs arbitrários)
-        if packet_id <= -1000 and packet_id > -2000:
-            id = -packet_id - 1000
+        if packet_id <= -ACK_OFFSET and packet_id > -NACK_OFFSET:
+            id = -packet_id - ACK_OFFSET
             window = client.get_retransmission_window()
             window_index = id - client.get_current_idx()
             if not 0 <= window_index < len(window):
@@ -227,8 +229,8 @@ class NetworkModel:
 
 
         # caso NACK package
-        elif packet_id <= -2000:
-            id = -packet_id - 2000
+        elif packet_id <= -NACK_OFFSET:
+            id = -packet_id - NACK_OFFSET
             window = client.get_retransmission_window()
             window_index = id - client.get_current_idx()
             if not 0 <= window_index < len(window):
@@ -309,7 +311,7 @@ class NetworkModel:
         time = temp["time"]
 
         #metrics
-        processing_time = random.uniform(2,5) + time * random.uniform(1.0, 1.5)
+        processing_time = 1 + time * 0.1
         self.set_total_processing_time(self.get_total_processing_time() + processing_time)
 
 
@@ -362,7 +364,7 @@ class NetworkModel:
             action = partial(
                 self.B_arrival,
                 client,
-                (packet_id+1000)*-1,
+                - (packet_id+ACK_OFFSET),
                 ActivityType.C_START_TRANSMISSION_INVERTED
             )
         )
@@ -388,7 +390,7 @@ class NetworkModel:
         temp = client.get_protocol_buffer().get_packet(packet_id)
         packet = temp["packet"]
         time = temp["time"]
-        processing_time =  time * random.uniform(1.0, 1.5)
+        processing_time =  1 + time * 0.1
 
         #metrics
         self.set_total_processing_time(self.get_total_processing_time() + processing_time)
@@ -551,7 +553,11 @@ class NetworkModel:
             self.engine.schedule(cell)
 
             next_client.get_protocol_buffer().add_packet(packet_id, packet)
-            
+
+            #remoção para nao armazenar nos nós intermediários
+            if client != self.clients[0]:
+                client.get_protocol_buffer().remove_packet(packet_id)
+
             print(
                 f"[B][AGENDADO] {cell.name.strip()} no cliente {next_client.get_name()} "
                 f"| horário={cell.time:.2f}."

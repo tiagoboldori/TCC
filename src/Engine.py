@@ -2,7 +2,8 @@
 from dataclasses import dataclass
 from functools import partial
 from math import inf
-
+import heapq
+import itertools
 
 @dataclass
 class TimeCell:
@@ -13,46 +14,31 @@ class TimeCell:
     def __str__(self):
         return f"TimeCell(name={self.name}, time={self.time})"
 
-
 class Engine:
 
     def __init__(self):
         self.__clock = 0
-        self.__time_cells = []
+        self.__heap = []
+        self.__counter = itertools.count()
 
     def get_time_cells(self):
-            return self.__time_cells
-    
-    def set_time_cells(self, time_cells):
-        self.__time_cells = time_cells
-
-    def add_time_cell(self, cell):
-        self.__time_cells.append(cell)
-
-
+        return [entry[2] for entry in sorted(self.__heap)]
 
     def schedule(self, cell):
         cell.time = self.get_current_time() + cell.time
-        self.add_time_cell(cell)
+        heapq.heappush(self.__heap, (cell.time, next(self.__counter), cell))
 
     def next_time(self):
-        return min(
-            (cell.time for cell in self.__time_cells),
-            default=inf
-        )
+        return self.__heap[0][0] if self.__heap else inf
 
-    def cells_due_now(self):
-        return [
-            cell
-            for cell in self.__time_cells
-            if cell.time == self.__clock
-        ]
+    def pop_due_now(self):
+        due = []
+        while self.__heap and self.__heap[0][0] == self.__clock:
+            due.append(heapq.heappop(self.__heap)[2])
+        return due
 
     def get_current_time(self):
         return self.__clock
 
     def set_current_time(self, time):
         self.__clock = time
-
-
-    

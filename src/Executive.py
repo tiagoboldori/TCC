@@ -30,11 +30,11 @@ class Executive:
             # Execução de B activities
             #======= B Phase ========
             print("\n[Fase B] Executando eventos agendados...")
-            due_cells = self.engine.cells_due_now()
+
+            due_cells = self.engine.pop_due_now()
             for cell in due_cells:
                 print(f"[Fase B][EVENTO] {cell.name} | horário={cell.time:.2f}.")
                 cell.action()
-                cell.time = inf
 
 
 

@@ -6,6 +6,7 @@ from src.ApplicationSpecific.Packet import Packet
 class LinkedList(DSA_Interface):
     def __init__(self, head: Node=None):
         self.__head = head
+        self.__size = 0
 
 
 
@@ -28,36 +29,50 @@ class LinkedList(DSA_Interface):
 
 
     def add_packet(self, packet_id, packet):
-        # Implement the logic to add a packet by its ID
-        new_node = Node(packet_id, packet)
+        # insere no fim; se o id já existe, só atualiza o pacote (mesmo comportamento da SkipList)
         if self.__head is None:
-            self.__head = new_node
-        else:
-            current = self.__head
-            while current.next is not None:
-                current = current.next
-            current.next = new_node
+            self.__head = Node(packet_id, packet)
+            self.__size += 1
+            return
+
+        current = self.__head
+        while True:
+            if current.get_id() == packet_id:
+                current.set_packet(packet)
+                return
+            if current.next is None:
+                break
+            current = current.next
+
+        current.next = Node(packet_id, packet)
+        self.__size += 1
 
 
     def remove_packet(self, packet_id):
-        # Implement the logic to remove a packet by its ID
+        # o tamanho só diminui se o pacote foi de fato removido
         if self.__head is None:
             return False
 
         if self.__head.get_id() == packet_id:
             self.__head = self.__head.next
+            self.__size -= 1
             return True
 
         current = self.__head
-
         while current.next is not None:
             if current.next.get_id() == packet_id:
                 current.next = current.next.next
+                self.__size -= 1
                 return True
             current = current.next
 
         return False
+    
+    def get_all_packets(self):
+        return []
 
+    def get_size(self):
+        return self.__size
 
 
 class Node:
@@ -76,3 +91,7 @@ class Node:
         return self.__packet
     def set_packet(self, packet):
         self.__packet = packet
+
+
+
+    
