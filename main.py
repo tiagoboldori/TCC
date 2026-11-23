@@ -15,16 +15,16 @@ from src.Engine import Engine, TimeCell
 SEED = 42          
 SEED = random.randrange(1_000_000) #basta comentar essa linha para fundamentação em materiais e metodos    
 NUM_CLIENTES = 10         
-NUM_PACOTES = 50
+NUM_PACOTES = 500
 WINDOW_SIZE = 10          
 BUFFER_SIZE = 10          
 DATA_STRUCTURE = "SkipList"
 
-LATENCIA = 15
-PERDA = 0.01
+LATENCIA = 123.5
+PERDA = 0.05
 VARIANCIA = 0.25
 
-UNTIL = 2_000
+UNTIL = 2_000_000
 # ===========================================================
 
 
