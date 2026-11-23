@@ -4,6 +4,29 @@ from src.ApplicationSpecific.Information import Info
 from src.ApplicationSpecific.QueueItem import QueueItem
 from src.ApplicationSpecific.config import config_loader
 
+import heapq
+import itertools
+
+from src.ApplicationSpecific.ActivityType import ActivityType
+
+from src.ApplicationSpecific.helpers import RttEstimator
+
+
+
+
+# Prioridade de atendimento na fila de atividades (menor = atendido antes).
+# Sem preempção: a atividade em execução nunca é interrompida.
+# Dentro da mesma prioridade, FIFO (ordem de chegada).
+ACTIVITY_PRIORITY = {
+    ActivityType.C_START_TRANSMISSION: 0,
+    ActivityType.C_START_TRANSMISSION_INVERTED: 0,
+    ActivityType.C_START_PROCESSING_GENERIC_INVERTED: 1,  # fluxo de confirmação (ACK/NACK)
+    ActivityType.C_PROCESS_ACK: 1,
+    ActivityType.C_PROCESS_NACK: 1,
+    ActivityType.C_PROCESS_TIMEOUT: 1,
+    ActivityType.C_START_PROCESSING_GENERIC: 2,
+    ActivityType.C_LOAD_PACKET: 2,
+}
 
 # Nome é identificador de cliente
 # Representação por lista de adjacencias.
@@ -19,7 +42,9 @@ class Client:
         self.__adj = []
         self.__is_busy = False
 
-        self.__job_queue = deque()
+        self.__job_queue = []                  
+        self.__arrival_counter = itertools.count()
+
         self.__current_job = None
         self.__next_job = 0
 
@@ -34,6 +59,18 @@ class Client:
 
         self.__protocol_buffer= config_loader.DSAs[data_structure]()
         self.__buffer_size = buffer_size
+
+
+        self.__rtt_estimator = None
+
+    
+    # getter e setter
+    def get_rtt_estimator(self):
+        return self.__rtt_estimator
+
+    def set_rtt_estimator(self, estimator):
+        self.__rtt_estimator = estimator
+
 
 
     def get_buffer_size(self):
@@ -57,14 +94,35 @@ class Client:
 
     #Setters e Getters para fila de pacotes
     def get_job_queue(self):
-        return self.__job_queue
-    
+        return [entry[2] for entry in sorted(self.__job_queue)]
+
+    def has_jobs(self) -> bool:
+        return len(self.__job_queue) > 0
+
+    def add_to_queue(self, packet_id, activity_type):
+        priority = ACTIVITY_PRIORITY[activity_type]
+        heapq.heappush(
+            self.__job_queue,
+            (priority, next(self.__arrival_counter), QueueItem(packet_id, activity_type))
+        )
+
     def set_job_queue(self, queue):
         self.__job_queue = queue
 
+    def pop_next_job(self, can_start):
+        skipped = []
+        job = None
+        while self.__job_queue:
+            entry = heapq.heappop(self.__job_queue)
+            if can_start(entry[2]):
+                job = entry[2]
+                break
+            skipped.append(entry)
 
-    def add_to_queue(self, packet_id, activity_type):
-        self.__job_queue.append(QueueItem(packet_id, activity_type))
+        for entry in skipped:
+            heapq.heappush(self.__job_queue, entry)
+
+        return job
 
     def enqueue(self, packet_id, activity_type):
         self.__job_queue.appendleft(QueueItem(packet_id, activity_type))

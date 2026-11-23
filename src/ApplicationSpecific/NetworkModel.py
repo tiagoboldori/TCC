@@ -44,14 +44,13 @@ class NetworkModel:
     def get_clients(self):
         return self.clients
 
+    
+
     #Processamento de atividades B
     #Packet ID é o equivalente ao seq_number do pacote
+    #Fila de prioridade é criada aqui (transmissao: top; confimação de ACK:mid; etc:low)
     def B_arrival(self, client,  packet_id: int, activity_type: ActivityType):
-        if activity_type == ActivityType.C_START_TRANSMISSION or activity_type == ActivityType.C_START_TRANSMISSION_INVERTED:
-            client.enqueue(packet_id, activity_type)
-
-        else:
-            client.add_to_queue(packet_id, activity_type)
+        client.add_to_queue(packet_id, activity_type)
 
 
 
@@ -75,42 +74,34 @@ class NetworkModel:
 
     def C_process(self, client: Client):
 
-        if client.get_is_busy() or len(client.get_job_queue()) == 0:
+        if client.get_is_busy() or not client.has_jobs():
             return
 
+        # LOAD só começa se o pacote estiver dentro da janela e houver espaço no buffer
+        def can_start(job):
+            if job.get_activity_type() == ActivityType.C_LOAD_PACKET:
+                return can_load(client, job.get_packet_id())
+            return True
 
+        current_job = client.pop_next_job(can_start)
 
-    
-        #verificação para atividade LOAD_PACKET (tamanho do buffer de protocolo) -> caso o buffer esteja cheio, adiar a atividade de carregamento de pacotes
-        queue = client.get_job_queue()
-
-
-
-        if queue[0].get_activity_type() == ActivityType.C_LOAD_PACKET and client.get_protocol_buffer().get_size() >= client.get_buffer_size():
-            for _ in range(len(queue)):
-                current_job = queue.popleft()
-                if current_job.get_activity_type() != ActivityType.C_LOAD_PACKET:
-                    break
-                queue.append(current_job)
-            else:
-                print(
-                    f"[C][ADIADO] Cliente {client.get_name()}: buffer de protocolo cheio "
-                    f"({client.get_protocol_buffer().get_size()}/{client.get_buffer_size()}); "
-                    "pacotes aguardam espaço."
-                )
-                return
-
-        else:
-
-            current_job = queue.popleft()
-                
+        if current_job is None:
+            print(
+                f"[C][ADIADO] Cliente {client.get_name()}: carregamentos aguardam a janela "
+                f"ou espaço no buffer ({client.get_protocol_buffer().get_size()}/{client.get_buffer_size()})."
+            )
+            return
         client.set_current_job(current_job)
+
 
         packet_id = current_job.get_packet_id()
         activity_type = current_job.get_activity_type()
 
+
         client.set_current_job(current_job)
         client.set_is_busy(True)
+
+
 
 
         match activity_type:
@@ -121,7 +112,6 @@ class NetworkModel:
                 self.C_start_transmission_inverted(client, packet_id, activity_type)
 
             case ActivityType.C_START_PROCESSING_GENERIC:
-                # valor arbitrario de processamento obtido a partir de uma distribuicao uniforme + tempo da DSA usada * distribuicao uniforme arbitraria de 1.0 até 1.5 (para source / destination)
                 if client == self.clients[0]:
                     self.C_start_processing_source(client, packet_id, activity_type)
                     
@@ -213,6 +203,9 @@ class NetworkModel:
                 "atualizando janela de retransmissão."
             )
             window[window_index] = 1
+
+            client.get_rtt_estimator().on_ack(id, self.engine.get_current_time())
+
             client.get_protocol_buffer().remove_packet(id)
 
             while window and window[0] == 1:
@@ -272,7 +265,7 @@ class NetworkModel:
 
             cell = TimeCell(
                 name = f"{client.get_name()} B_departure for C_process_nack",
-                time = 0.5,
+                time = 0,
                 action = partial(
                     self.B_departure,
                     client
@@ -284,7 +277,7 @@ class NetworkModel:
             #start_transmission routine
             cell = TimeCell(
                 name = f"{client.get_name()} B_arrival for C_start_transmission",
-                time = 0.5,
+                time = 0,
                 action = partial(
                     self.B_arrival,
                     client,
@@ -292,7 +285,7 @@ class NetworkModel:
                     ActivityType.C_START_TRANSMISSION
                 )
             )
-            print(f"[B][AGENDADO] Retransmissão do pacote #{id} em 0.50 unidade de tempo.")
+            print(f"[B][AGENDADO] Retransmissão do pacote #{id} em 0 unidade de tempo.")
 
             self.engine.schedule(cell)
 
@@ -301,6 +294,18 @@ class NetworkModel:
 
         #GENERIC PACKAGE
         # PACKAGE != ACK / NACK
+        if is_acked(client, packet_id):
+            print(
+                f"[C][DESCARTE] Cliente {client.get_name()}: pacote #{packet_id} já foi confirmado; retransmissão cancelada"
+            )
+            self.engine.schedule(TimeCell(
+                name=f"{client.get_name()} B_departure",
+                time = 0,
+                action = partial(self.B_departure, client)
+            ))
+            return
+
+
         temp = client.get_protocol_buffer().get_packet(packet_id)
         packet = temp["packet"]
         time = temp["time"]
@@ -488,13 +493,31 @@ class NetworkModel:
             print(f"[B][AGENDADO] {cell.name.strip()} | horário={cell.time:.2f}.")
 
 
+
             #AGENDAMENTO DE TIMEOUT
-            #valor arbitrario temporario
+            #pendente correção do tempo de RTT
+            packet = client.get_protocol_buffer().get_packet(packet_id)["packet"]
+            
+            if packet is None:
+                print(
+                    f"[C][TRANSMISSÃO] Cliente {client.get_name()}: pacote #{packet_id} "
+                    "não está no buffer; transmissão cancelada."
+                )
+                return
+            
             if client == self.clients[0]:
-                latencia_total = rtt(self) 
+
+                estimator = client.get_rtt_estimator()
+                if estimator is None:
+                    initial = rtt(self)          # estimativa inicial, antes da 1ª amostra
+                    estimator = RttEstimator(initial_timeout=initial, max_timeout=4 * initial)
+                    client.set_rtt_estimator(estimator)
+
+                estimator.on_send(packet_id, self.engine.get_current_time())
+
                 cell = TimeCell(
                     name = f"{client.get_name()} B_arrival",
-                    time =  latencia_total,
+                    time = estimator.get_timeout(),
                     action = partial(
                         self.B_arrival,
                         client,
@@ -529,7 +552,7 @@ class NetworkModel:
 
             self.engine.schedule(cell)
 
-            next_client.get_protocol_buffer().add_packet(packet_id, client.get_protocol_buffer().get_packet(packet_id)["packet"])
+            next_client.get_protocol_buffer().add_packet(packet_id, packet)
             
             print(
                 f"[B][AGENDADO] {cell.name.strip()} no cliente {next_client.get_name()} "
@@ -575,11 +598,11 @@ class NetworkModel:
                     info = a[1]
                     break
 
-            # PESQUISAR SOBRE TEMPO DE ENVIO / PROCESSAMENTO PARA ESTE CASO EM ESPECIFICO PARA BASE DE SIMULACAO MELHOR
-            # Atualmente agendado para 0.5 ut no futuro de forma arbitraria.
+
+
             cell = TimeCell(
                 name = f"{client.get_name()} B_departure ",
-                time = 0.5,
+                time = 0,
                 action = partial(
                     self.B_departure,
                     client
@@ -644,7 +667,7 @@ class NetworkModel:
 
         cell = TimeCell(
             name = f"{client.get_name()} B_departure for C_process_ack",
-            time = 0.5,
+            time = 0,
             action = partial(
                 self.B_departure,
                 client
@@ -663,7 +686,7 @@ class NetworkModel:
 
         cell = TimeCell(
             name = f"{client.get_name()} B_departure for C_process_nack",
-            time = 0.5,
+            time = 0,
             action = partial(
                 self.B_departure,
                 client
@@ -687,13 +710,16 @@ class NetworkModel:
                 f"[C][TIMEOUT] Pacote #{packet_id} já não pertence à janela atual; "
                 "retransmissão ignorada."
             )
+
         elif window[window_index] == 1:
             print(
                 f"[C][TIMEOUT] Pacote #{packet_id} já foi confirmado; "
                 "retransmissão desnecessária."
             )
 
+        
         else:
+            client.get_rtt_estimator().on_timeout()
             cell = TimeCell(
                 name = f"{client.get_name()} B_arrival",
                 time = 0.1,
@@ -712,7 +738,7 @@ class NetworkModel:
         
         cell = TimeCell(
             name = f"{client.get_name()} B_departure",
-            time = 0.5,
+            time = 0,
             action = partial(
                 self.B_departure,
                 client

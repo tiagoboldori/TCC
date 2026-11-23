@@ -1,1 +1,1 @@
-Simulador apresentado como parte do projeto de conclusão de curso.
+Simulador de redes de computadores baseado em eventos discretos, desenvolvido como parte do Trabalho de Conclusão de Curso. Projeto desenvolvido sobre o pretexto de avaliar o impacto da escolha de estruturas de dados no contexto de redes.
