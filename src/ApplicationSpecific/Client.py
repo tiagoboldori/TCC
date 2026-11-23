@@ -1,5 +1,3 @@
-from collections import deque
-
 from src.ApplicationSpecific.Information import Info
 from src.ApplicationSpecific.QueueItem import QueueItem
 from src.ApplicationSpecific.config import config_loader
@@ -8,9 +6,6 @@ import heapq
 import itertools
 
 from src.ApplicationSpecific.ActivityType import ActivityType
-
-from src.ApplicationSpecific.helpers import RttEstimator
-
 
 
 
@@ -28,13 +23,14 @@ ACTIVITY_PRIORITY = {
     ActivityType.C_LOAD_PACKET: 2,
 }
 
+
+
+
+
+
 # Nome é identificador de cliente
 # Representação por lista de adjacencias.
 # adj = [[Cliente, Info], [Cliente2, Info2], ...]
-
-
-
-
 class Client:
     def __init__(self, name: str, data_structure: str, window_size = 1, buffer_size = 2) -> None:
 
@@ -106,9 +102,6 @@ class Client:
             (priority, next(self.__arrival_counter), QueueItem(packet_id, activity_type))
         )
 
-    def set_job_queue(self, queue):
-        self.__job_queue = queue
-
     def pop_next_job(self, can_start):
         skipped = []
         job = None
@@ -124,16 +117,6 @@ class Client:
 
         return job
 
-    def enqueue(self, packet_id, activity_type):
-        self.__job_queue.appendleft(QueueItem(packet_id, activity_type))
-
-    def remove_from_queue(self, queueItem):
-        for item in self.__job_queue:
-            if item == queueItem:
-                self.__job_queue.remove(item)
-                return
-
-            
 
 
     # GETTER PARA LISTA DE PACOTES (dsa) PROTOCOL BUFFER / APPLICATION MEMORY

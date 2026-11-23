@@ -64,9 +64,9 @@ class NetworkModel:
     #Processamento de atividades C
     #Assume-se que a chegada de pacotes implica na seguinte sequencia: C_processamento -> C_transmissao
     #Subrotinas a serem simuladas:
-    # Janela deslizante respeitando a regra de seq_number (Ver kurose e ross)
+    # Janela deslizante respeitando a regra de seq_number (Ver kurose e ross / tanembaum)
     # Timeout para cada pacote nao confirmado dentro da janela 
-    # fluxo de ACK e NACK (ver kurose e ross)
+    # fluxo de ACK e NACK (ver kurose e ross / tanembaum)
     def C_process_all(self):
         for client in self.clients:
             self.C_process(client)
@@ -91,7 +91,6 @@ class NetworkModel:
                 f"ou espaço no buffer ({client.get_protocol_buffer().get_size()}/{client.get_buffer_size()})."
             )
             return
-        client.set_current_job(current_job)
 
 
         packet_id = current_job.get_packet_id()
@@ -100,7 +99,6 @@ class NetworkModel:
 
         client.set_current_job(current_job)
         client.set_is_busy(True)
-
 
 
 

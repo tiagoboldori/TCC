@@ -1,18 +1,15 @@
-
 def rtt(netModel):
-    rtt = 0
-
+    
+    total = 0
     clients = netModel.get_clients()
-    for i in range(len(clients)):
-        for adj in clients[i].get_all_adj():
-            try:
-                if adj[0] == clients[i+1]:
-                    rtt += adj[1].get_latencia()
-            except:
-                pass
-            
-    return rtt*3
 
+    for atual, proximo in zip(clients, clients[1:]):
+        adj = atual.get_adj(proximo)
+        if adj is None:
+            raise ValueError(f"{atual.get_name()} não tem enlace com {proximo.get_name()}")
+        total += adj[1].get_latencia()
+
+    return total * 3
 
 
 
